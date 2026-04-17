@@ -1,0 +1,29 @@
+{
+  "name": "board-governance",
+  "version": "0.1.0",
+  "description": "Board Governance Module for University DSS",
+  "private": true,
+  "license": "MIT",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:contract": "turbo run test:contract",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "db:migrate": "cd prisma && prisma migrate dev",
+    "db:seed": "cd prisma && ts-node seed.ts",
+    "db:push": "cd prisma && prisma db push",
+    "db:studio": "cd prisma && prisma studio"
+  },
+  "devDependencies": {
+    "@turbo/gen": "^1.12.4",
+    "turbo": "^1.12.4"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

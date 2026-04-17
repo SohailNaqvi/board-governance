@@ -1,0 +1,300 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ Status Enums ============
+
+enum AgendaItemStatus {
+  DRAFT
+  SUBMITTED
+  VETTED
+  APPROVED_FOR_AGENDA
+  CIRCULATED
+  DECIDED
+  CLOSED
+  RETURNED
+  DEFERRED
+  WITHDRAWN
+}
+
+enum WorkingPaperStatus {
+  INSTANTIATED
+  IN_AUTHORING
+  IN_REVIEW
+  FINALIZED
+  CIRCULATED
+  ARCHIVED
+}
+
+enum ActionTakenEntryStatus {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  CLOSED
+}
+
+enum UserRole {
+  AUTHORIZED_PROPOSER
+  FEEDER_BODY_SECRETARY
+  REGISTRAR
+  TREASURER_LEGAL
+  VICE_CHANCELLOR
+  SYNDICATE_MEMBER
+  SYSTEM_ADMINISTRATOR
+}
+
+// ============ Core Entities ============
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MeetingCalendar {
+  id              String   @id @default(cuid())
+  meetingNumber   Int      @unique
+  meetingDate     DateTime
+  meetingLocation String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  agendaItems      AgendaItem[]
+  workingPapers    WorkingPaper[]
+  resolutions      FeederBodyResolution[]
+  decisions        Decision[]
+}
+
+model AgendaItem {
+  id                String             @id @default(cuid())
+  meetingCalendarId String
+  itemNumber        Int
+  title             String
+  description       String?
+  status            AgendaItemStatus   @default(DRAFT)
+  proposedBy        String
+  submittedDate     DateTime?
+  vetted            Boolean            @default(false)
+  vettedDate        DateTime?
+  vetterNotes       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  meetingCalendar   MeetingCalendar    @relation(fields: [meetingCalendarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  workingPapers     WorkingPaper[]
+  resolutions       FeederBodyResolution[]
+  annexures         Annexure[]
+  decisions         Decision[]
+
+  @@unique([meetingCalendarId, itemNumber])
+  @@index([meetingCalendarId])
+  @@index([status])
+  @@index([proposedBy])
+}
+
+model WorkingPaper {
+  id              String               @id @default(cuid())
+  meetingCalendarId String
+  agendaItemId    String
+  title           String
+  content         String?
+  status          WorkingPaperStatus   @default(INSTANTIATED)
+  authoredBy      String
+  reviewedBy      String?
+  reviewComments  String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  meetingCalendar MeetingCalendar      @relation(fields: [meetingCalendarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  agendaItem      AgendaItem           @relation(fields: [agendaItemId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  annexures       Annexure[]
+  readReceipts    ReadReceipt[]
+
+  @@index([meetingCalendarId])
+  @@index([agendaItemId])
+  @@index([status])
+  @@index([authoredBy])
+}
+
+model Annexure {
+  id              String   @id @default(cuid())
+  agendaItemId    String
+  workingPaperId  String
+  fileName        String
+  fileType        String
+  fileSize        Int
+  fileUrl         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  agendaItem      AgendaItem  @relation(fields: [agendaItemId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  workingPaper    WorkingPaper @relation(fields: [workingPaperId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([agendaItemId])
+  @@index([workingPaperId])
+}
+
+model FeederBodyResolution {
+  id                String   @id @default(cuid())
+  meetingCalendarId String
+  agendaItemId      String
+  bodyCode          String
+  resolutionNumber  Int
+  resolutionText    String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  meetingCalendar   MeetingCalendar @relation(fields: [meetingCalendarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  agendaItem        AgendaItem      @relation(fields: [agendaItemId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([bodyCode, resolutionNumber])
+  @@index([meetingCalendarId])
+  @@index([agendaItemId])
+  @@index([bodyCode])
+}
+
+model SyndicateMember {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String
+  memberNumber    String   @unique
+  department      String?
+  joinDate        DateTime
+  status          String   @default("ACTIVE")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  readReceipts    ReadReceipt[]
+  memberQueries   MemberQuery[]
+
+  @@index([status])
+}
+
+model ReadReceipt {
+  id              String   @id @default(cuid())
+  workingPaperId  String
+  syndicateMemberId String
+  readAt          DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workingPaper    WorkingPaper @relation(fields: [workingPaperId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  syndicateMember SyndicateMember @relation(fields: [syndicateMemberId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([workingPaperId, syndicateMemberId])
+  @@index([workingPaperId])
+  @@index([syndicateMemberId])
+}
+
+model MemberQuery {
+  id                String   @id @default(cuid())
+  syndicateMemberId String
+  queryText         String
+  queryDate         DateTime @default(now())
+  responseText      String?
+  responseDate      DateTime?
+  status            String   @default("OPEN")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  syndicateMember   SyndicateMember @relation(fields: [syndicateMemberId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([syndicateMemberId])
+  @@index([status])
+}
+
+model Decision {
+  id                String   @id @default(cuid())
+  meetingCalendarId String
+  agendaItemId      String
+  decisionText      String
+  decisionDate      DateTime
+  decidedBy         String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  meetingCalendar   MeetingCalendar @relation(fields: [meetingCalendarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  agendaItem        AgendaItem      @relation(fields: [agendaItemId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  actionTaken       ActionTakenEntry[]
+
+  @@index([meetingCalendarId])
+  @@index([agendaItemId])
+  @@index([decidedBy])
+}
+
+model ActionTakenEntry {
+  id                String                    @id @default(cuid())
+  decisionId        String
+  description       String
+  assignedTo        String
+  dueDate           DateTime
+  status            ActionTakenEntryStatus    @default(OPEN)
+  completedDate     DateTime?
+  notes             String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  decision          Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  notificationForAction NotificationForAction[]
+
+  @@index([decisionId])
+  @@index([assignedTo])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model NotificationForAction {
+  id                    String   @id @default(cuid())
+  actionTakenEntryId    String
+  recipientEmail        String
+  notificationDate      DateTime @default(now())
+  acknowledgedDate      DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  actionTakenEntry      ActionTakenEntry @relation(fields: [actionTakenEntryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([actionTakenEntryId])
+  @@index([recipientEmail])
+}
+
+model AuditEvent {
+  id                String   @id @default(cuid())
+  eventType         String
+  entityType        String
+  entityId          String
+  userId            String
+  changes           String   // JSON serialized
+  payloadHash       String
+  timestamp         DateTime @default(now())
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime @default(now())
+
+  @@index([eventType])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([userId])
+  @@index([timestamp])
+}
