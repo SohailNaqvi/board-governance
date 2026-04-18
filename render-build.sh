@@ -7,12 +7,10 @@ npm install -g pnpm@9
 echo "=== Installing dependencies ==="
 pnpm install --no-frozen-lockfile
 
-echo "=== Adding Prisma to workspace root ==="
-pnpm add prisma@5.22.0 @prisma/client@5.22.0 -w -D
-
-echo "=== Generating Prisma client ==="
+echo "=== Generating Prisma client with npm (avoids pnpm workspace conflict) ==="
 cd apps/web
-pnpm exec prisma generate --schema=../../prisma/schema.prisma
+npm install prisma@5.22.0 @prisma/client@5.22.0 --no-save
+npx prisma@5.22.0 generate --schema=../../prisma/schema.prisma
 
 echo "=== Building Next.js ==="
 npx next build
