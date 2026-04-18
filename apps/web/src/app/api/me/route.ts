@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySession } from "@/lib/auth";
-import logger from "@/lib/logger";
+import { verifySession } from "../../../lib/auth";
+import logger from "../../../lib/logger";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {

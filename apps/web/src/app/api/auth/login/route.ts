@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSession, findSeedUserByEmail } from "@/lib/auth";
-import logger from "@/lib/logger";
+import { createSession, findSeedUserByEmail } from "../../../lib/auth";
+import logger from "../../../lib/logger";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
