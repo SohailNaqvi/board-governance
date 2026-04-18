@@ -15,9 +15,6 @@
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
-    "@ums/audit": "workspace:*",
-    "@ums/domain": "workspace:*",
-    "@ums/source-data": "workspace:*",
     "jose": "^6.2.2",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^1.8.0",

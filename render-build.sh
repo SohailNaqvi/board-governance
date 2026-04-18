@@ -12,7 +12,6 @@ echo "=== Generating Prisma client ==="
 mv pnpm-lock.yaml pnpm-lock.yaml.bak
 mv pnpm-workspace.yaml pnpm-workspace.yaml.bak
 
-# Now prisma will detect npm and 'npm add' will work
 cd apps/web
 npx prisma@5.22.0 generate --schema=../../prisma/schema.prisma
 
@@ -21,8 +20,8 @@ cd ../..
 mv pnpm-lock.yaml.bak pnpm-lock.yaml
 mv pnpm-workspace.yaml.bak pnpm-workspace.yaml
 
-echo "=== Running Slice 2 migration ==="
-pnpm add pg -w --no-lockfile
+echo "=== Running Slice 2 DB migration ==="
+# pg is in root dependencies, installed by pnpm install above
 node prisma/migrate-slice2.mjs
 
 echo "=== Building Next.js ==="
