@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: university-dss
+    runtime: node
+    buildCommand: |
+      npm install -g pnpm@9 &&
+      pnpm install --no-frozen-lockfile &&
+      cd apps/web && npx prisma generate --schema=../../prisma/schema.prisma &&
+      cd ../.. && pnpm run build
+    startCommand: cd apps/web && npx next start -p $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: must-reporting-db
+          property: connectionString
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATA_PROVIDER
+        value: mock
