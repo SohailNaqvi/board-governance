@@ -4,8 +4,8 @@ set -e
 echo "=== Installing pnpm ==="
 npm install -g pnpm@9
 
-echo "=== Installing dependencies ==="
-pnpm install --no-frozen-lockfile
+echo "=== Installing dependencies (including dev) ==="
+NODE_ENV=development pnpm install --no-frozen-lockfile
 
 echo "=== Generating Prisma client ==="
 # Hide pnpm files so prisma doesn't try 'pnpm add' (which fails in workspaces)
