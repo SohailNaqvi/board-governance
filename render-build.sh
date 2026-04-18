@@ -8,12 +8,18 @@ echo "=== Installing dependencies ==="
 pnpm install --no-frozen-lockfile
 
 echo "=== Generating Prisma client ==="
-mkdir -p /tmp/prisma-gen
-cd /tmp/prisma-gen
-npm init -y > /dev/null 2>&1
-npm install prisma@5.22.0 @prisma/client@5.22.0 --save > /dev/null 2>&1
-cd -
-/tmp/prisma-gen/node_modules/.bin/prisma generate --schema=./prisma/schema.prisma
+# Hide pnpm files so prisma doesn't try 'pnpm add' (which fails in workspaces)
+mv pnpm-lock.yaml pnpm-lock.yaml.bak
+mv pnpm-workspace.yaml pnpm-workspace.yaml.bak
+
+# Now prisma will detect npm and 'npm add' will work
+cd apps/web
+npx prisma@5.22.0 generate --schema=../../prisma/schema.prisma
+
+# Restore pnpm files
+cd ../..
+mv pnpm-lock.yaml.bak pnpm-lock.yaml
+mv pnpm-workspace.yaml.bak pnpm-workspace.yaml
 
 echo "=== Building Next.js ==="
 cd apps/web
