@@ -2766,6 +2766,466 @@ const formatDate = (isoString) => {
 };
 
 /* ══════════════════════════════════════════════════════════
+   MEETING CALENDAR MANAGER — SLICE 2 (APCE Integration)
+   Creates meetings, auto-generates 10 APCE events with backward-derived
+   deadlines, and dispatches notifications to relevant roles.
+   ══════════════════════════════════════════════════════════ */
+
+const APCE_STATUS_COLORS = {
+  PENDING:   { bg: "#f3f4f6", text: "#6b7280", label: "Pending" },
+  TRIGGERED: { bg: "#fef3c7", text: "#d97706", label: "Triggered" },
+  COMPLETED: { bg: "#d1fae5", text: "#059669", label: "Completed" },
+  SKIPPED:   { bg: "#fee2e2", text: "#dc2626", label: "Skipped" },
+};
+
+const MEETING_STATUS_LABELS = {
+  DRAFT: "Draft", SCHEDULED: "Scheduled", CALL_ISSUED: "Call Issued",
+  SUBMISSIONS_OPEN: "Submissions Open", SUBMISSIONS_CLOSED: "Submissions Closed",
+  AGENDA_APPROVED: "Agenda Approved", PAPERS_CIRCULATED: "Papers Circulated",
+  IN_SESSION: "In Session", CONCLUDED: "Concluded",
+  MINUTES_DRAFTED: "Minutes Drafted", MINUTES_CONFIRMED: "Minutes Confirmed",
+};
+
+const MEETING_STATUS_COLORS = {
+  DRAFT: "#9ca3af", SCHEDULED: "#3b82f6", CALL_ISSUED: "#8b5cf6",
+  SUBMISSIONS_OPEN: "#10b981", SUBMISSIONS_CLOSED: "#f59e0b",
+  AGENDA_APPROVED: "#06b6d4", PAPERS_CIRCULATED: "#6366f1",
+  IN_SESSION: "#ef4444", CONCLUDED: "#10b981",
+  MINUTES_DRAFTED: "#f97316", MINUTES_CONFIRMED: "#059669",
+};
+
+function MeetingCalendarManager() {
+  const [meetings, setMeetings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [newMeeting, setNewMeeting] = useState({ title: "", meetingDate: "", meetingLocation: "", onlineMeetingLink: "", quorum: "" });
+  const [creating, setCreating] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchMeetings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/board/calendar?includeEvents=true");
+      if (res.ok) {
+        const data = await res.json();
+        setMeetings(data.meetings || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch meetings:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch("/api/board/notifications?limit=20");
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unreadCount || 0);
+      }
+    } catch (e) {
+      console.error("Failed to fetch notifications:", e);
+    }
+  }, []);
+
+  useEffect(() => { fetchMeetings(); fetchNotifications(); }, [fetchMeetings, fetchNotifications]);
+
+  const createMeeting = async () => {
+    if (!newMeeting.meetingDate) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/board/calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMeeting),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setShowCreate(false);
+        setNewMeeting({ title: "", meetingDate: "", meetingLocation: "", onlineMeetingLink: "", quorum: "" });
+        await fetchMeetings();
+        await fetchNotifications();
+        setSelectedMeeting(data.meeting.id);
+      }
+    } catch (e) {
+      console.error("Failed to create meeting:", e);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const triggerAPCEEvent = async (eventId) => {
+    try {
+      await fetch("/api/board/apce-events", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: eventId, status: "TRIGGERED" }),
+      });
+      await fetchMeetings();
+      await fetchNotifications();
+    } catch (e) {
+      console.error("Failed to trigger APCE event:", e);
+    }
+  };
+
+  const completeAPCEEvent = async (eventId) => {
+    try {
+      await fetch("/api/board/apce-events", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: eventId, status: "COMPLETED" }),
+      });
+      await fetchMeetings();
+    } catch (e) {
+      console.error("Failed to complete APCE event:", e);
+    }
+  };
+
+  const markAllRead = async () => {
+    try {
+      await fetch("/api/board/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markAllRead: true, role: "VICE_CHANCELLOR" }),
+      });
+      await fetchNotifications();
+    } catch (e) {
+      console.error("Failed to mark notifications read:", e);
+    }
+  };
+
+  const activeMeeting = meetings.find(m => m.id === selectedMeeting);
+  const now = new Date();
+
+  const formatDate = (d) => {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  };
+
+  const formatTime = (d) => {
+    if (!d) return "";
+    return new Date(d).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const daysUntil = (d) => {
+    if (!d) return null;
+    const diff = Math.ceil((new Date(d).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return diff;
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header with Notification Bell */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Calendar className="w-6 h-6 text-blue-600" />
+            Meeting Calendar & APCE Timeline
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">Manage Syndicate meetings with auto-generated APCE workflow events</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Notification Bell */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2 rounded-lg hover:bg-gray-100 transition"
+            >
+              <Bell className="w-5 h-5 text-gray-600" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+            {showNotifications && (
+              <div className="absolute right-0 top-12 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
+                <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+                  <span className="font-bold text-sm text-gray-900">Notifications</span>
+                  {unreadCount > 0 && (
+                    <button onClick={markAllRead} className="text-xs text-blue-600 hover:underline">Mark all read</button>
+                  )}
+                </div>
+                {notifications.length === 0 ? (
+                  <div className="p-4 text-sm text-gray-500 text-center">No notifications</div>
+                ) : (
+                  notifications.map(n => (
+                    <div key={n.id} className={`p-3 border-b border-gray-50 ${n.read ? "opacity-60" : "bg-blue-50"}`}>
+                      <div className="flex items-start gap-2">
+                        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${n.read ? "bg-gray-300" : "bg-blue-500"}`} />
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{n.title}</div>
+                          <div className="text-xs text-gray-600 mt-0.5">{n.message}</div>
+                          <div className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString()}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm"
+          >
+            <Plus className="w-4 h-4" /> Schedule Meeting
+          </button>
+        </div>
+      </div>
+
+      {/* Create Meeting Form */}
+      {showCreate && (
+        <div className="bg-blue-50 rounded-lg border border-blue-200 p-5">
+          <h3 className="font-bold text-blue-900 text-lg mb-4 flex items-center gap-2">
+            <Calendar className="w-5 h-5" /> Schedule New Syndicate Meeting
+          </h3>
+          <p className="text-sm text-blue-700 mb-4">Setting a meeting date will automatically generate all 10 APCE workflow events with backward-derived deadlines and notify relevant stakeholders.</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Meeting Title</label>
+              <input type="text" value={newMeeting.title} onChange={e => setNewMeeting(p => ({...p, title: e.target.value}))}
+                placeholder="e.g. 47th Meeting of the Syndicate" className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Meeting Date *</label>
+              <input type="date" value={newMeeting.meetingDate} onChange={e => setNewMeeting(p => ({...p, meetingDate: e.target.value}))}
+                className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Venue</label>
+              <input type="text" value={newMeeting.meetingLocation} onChange={e => setNewMeeting(p => ({...p, meetingLocation: e.target.value}))}
+                placeholder="e.g. Syndicate Hall, Admin Block" className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Online Meeting Link</label>
+              <input type="text" value={newMeeting.onlineMeetingLink} onChange={e => setNewMeeting(p => ({...p, onlineMeetingLink: e.target.value}))}
+                placeholder="e.g. https://zoom.us/j/..." className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quorum</label>
+              <input type="text" value={newMeeting.quorum} onChange={e => setNewMeeting(p => ({...p, quorum: e.target.value}))}
+                placeholder="e.g. 7 of 13 members" className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <button onClick={createMeeting} disabled={!newMeeting.meetingDate || creating}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium text-sm flex items-center gap-2">
+              {creating ? "Creating..." : <><Zap className="w-4 h-4" /> Create & Generate APCE Events</>}
+            </button>
+            <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Meeting List */}
+      <div className="grid grid-cols-1 gap-4">
+        {loading ? (
+          <div className="text-center py-8 text-gray-500">Loading meetings...</div>
+        ) : meetings.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+            <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">No meetings scheduled yet</p>
+            <p className="text-sm text-gray-400 mt-1">Schedule your first Syndicate meeting to generate APCE events</p>
+          </div>
+        ) : (
+          meetings.map(meeting => {
+            const isExpanded = selectedMeeting === meeting.id;
+            const days = daysUntil(meeting.meetingDate);
+            const statusColor = MEETING_STATUS_COLORS[meeting.status] || "#6b7280";
+            const apceEvents = meeting.apceEvents || [];
+            const completedEvents = apceEvents.filter(e => e.status === "COMPLETED").length;
+            const triggeredEvents = apceEvents.filter(e => e.status === "TRIGGERED").length;
+
+            return (
+              <div key={meeting.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                {/* Meeting Header */}
+                <div
+                  className="p-4 cursor-pointer hover:bg-gray-50 transition"
+                  onClick={() => setSelectedMeeting(isExpanded ? null : meeting.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-lg flex flex-col items-center justify-center" style={{ backgroundColor: statusColor + "15", color: statusColor }}>
+                        <span className="text-xs font-bold">{new Date(meeting.meetingDate).toLocaleDateString("en-US", { month: "short" })}</span>
+                        <span className="text-lg font-black leading-tight">{new Date(meeting.meetingDate).getDate()}</span>
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900">{meeting.title || `Meeting #${meeting.meetingNumber}`}</div>
+                        <div className="text-sm text-gray-500 flex items-center gap-3">
+                          <span>{formatDate(meeting.meetingDate)}</span>
+                          {meeting.meetingLocation && <span>• {meeting.meetingLocation}</span>}
+                          {meeting.quorum && <span>• Quorum: {meeting.quorum}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      {/* APCE Progress */}
+                      <div className="text-right">
+                        <div className="text-xs text-gray-500">APCE Progress</div>
+                        <div className="flex items-center gap-1 mt-1">
+                          {apceEvents.map((ev, i) => (
+                            <div key={i} className="w-3 h-3 rounded-full" title={`${ev.eventName}: ${ev.status}`}
+                              style={{ backgroundColor: APCE_STATUS_COLORS[ev.status]?.text || "#9ca3af" }} />
+                          ))}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-0.5">{completedEvents}/{apceEvents.length} complete</div>
+                      </div>
+                      {/* Status Badge */}
+                      <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: statusColor + "15", color: statusColor }}>
+                        {MEETING_STATUS_LABELS[meeting.status] || meeting.status}
+                      </span>
+                      {/* Days Badge */}
+                      {days !== null && (
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${days > 0 ? "bg-blue-50 text-blue-700" : days === 0 ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                          {days > 0 ? `${days}d away` : days === 0 ? "Today" : `${Math.abs(days)}d ago`}
+                        </span>
+                      )}
+                      {isExpanded ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronRight className="w-5 h-5 text-gray-400" />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expanded: Deadlines + APCE Timeline */}
+                {isExpanded && (
+                  <div className="border-t border-gray-200">
+                    {/* Key Deadlines Grid */}
+                    <div className="p-4 bg-gray-50">
+                      <h4 className="text-sm font-bold text-gray-700 mb-3">Key Deadlines (Auto-Computed from Meeting Date)</h4>
+                      <div className="grid grid-cols-4 gap-3">
+                        {[
+                          { label: "Call Notice", date: meeting.callNoticeAt, icon: Send },
+                          { label: "Submission Cut-off", date: meeting.cutoffAt, icon: Clock },
+                          { label: "VC Approval Due", date: meeting.vcApprovalDueAt, icon: UserCheck },
+                          { label: "Circulation", date: meeting.circulationAt, icon: Send },
+                          { label: "Query Close", date: meeting.queryCloseAt, icon: X },
+                          { label: "Meeting Date", date: meeting.meetingDate, icon: Calendar },
+                          { label: "Minutes Draft Due", date: meeting.minutesDraftDueAt, icon: FileText },
+                          { label: "Minutes Confirm", date: meeting.minutesConfirmAt, icon: CheckCircle },
+                        ].map((d, i) => {
+                          const DeadlineIcon = d.icon;
+                          const daysTo = daysUntil(d.date);
+                          const isPast = daysTo !== null && daysTo < 0;
+                          const isSoon = daysTo !== null && daysTo >= 0 && daysTo <= 3;
+                          return (
+                            <div key={i} className={`rounded-lg border p-3 ${isPast ? "bg-gray-100 border-gray-200" : isSoon ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"}`}>
+                              <div className="flex items-center gap-2 mb-1">
+                                <DeadlineIcon className="w-3.5 h-3.5 text-gray-400" />
+                                <span className="text-xs font-medium text-gray-600">{d.label}</span>
+                              </div>
+                              <div className={`text-sm font-bold ${isPast ? "text-gray-400" : isSoon ? "text-amber-700" : "text-gray-900"}`}>
+                                {formatDate(d.date)}
+                              </div>
+                              {daysTo !== null && (
+                                <div className={`text-xs mt-0.5 ${isPast ? "text-gray-400" : isSoon ? "text-amber-600" : "text-gray-500"}`}>
+                                  {daysTo > 0 ? `in ${daysTo} days` : daysTo === 0 ? "Today" : `${Math.abs(daysTo)} days ago`}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* APCE Timeline */}
+                    <div className="p-4">
+                      <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-amber-500" />
+                        APCE Event Timeline ({apceEvents.length} events)
+                      </h4>
+                      <div className="space-y-2">
+                        {apceEvents.map((ev, idx) => {
+                          const evDays = daysUntil(ev.scheduledAt);
+                          const isPast = evDays !== null && evDays < 0;
+                          const isToday = evDays === 0;
+                          const statusStyle = APCE_STATUS_COLORS[ev.status];
+                          return (
+                            <div key={ev.id} className="flex items-center gap-3 group">
+                              {/* Timeline connector */}
+                              <div className="flex flex-col items-center w-6">
+                                <div className={`w-3 h-3 rounded-full border-2 ${ev.status === "COMPLETED" ? "bg-green-500 border-green-500" : ev.status === "TRIGGERED" ? "bg-amber-500 border-amber-500" : isPast ? "bg-gray-300 border-gray-300" : "bg-white border-gray-300"}`} />
+                                {idx < apceEvents.length - 1 && <div className="w-0.5 h-6 bg-gray-200" />}
+                              </div>
+                              {/* Event Card */}
+                              <div className={`flex-1 flex items-center justify-between p-3 rounded-lg border ${ev.status === "COMPLETED" ? "bg-green-50 border-green-200" : ev.status === "TRIGGERED" ? "bg-amber-50 border-amber-200" : isToday ? "bg-blue-50 border-blue-200" : "bg-white border-gray-100"}`}>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-sm text-gray-900">{ev.eventName}</span>
+                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: statusStyle?.bg, color: statusStyle?.text }}>
+                                      {statusStyle?.label}
+                                    </span>
+                                    {ev.offsetDays !== 0 && (
+                                      <span className="text-xs text-gray-400">T{ev.offsetDays > 0 ? "+" : ""}{ev.offsetDays}d</span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-0.5">{ev.description}</div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="text-right">
+                                    <div className="text-xs font-medium text-gray-700">{formatDate(ev.scheduledAt)}</div>
+                                    {evDays !== null && (
+                                      <div className={`text-xs ${evDays > 0 ? "text-blue-600" : evDays === 0 ? "text-green-600 font-bold" : "text-gray-400"}`}>
+                                        {evDays > 0 ? `in ${evDays}d` : evDays === 0 ? "Today" : `${Math.abs(evDays)}d ago`}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {/* Action buttons */}
+                                  {ev.status === "PENDING" && (
+                                    <button onClick={(e) => { e.stopPropagation(); triggerAPCEEvent(ev.id); }}
+                                      className="opacity-0 group-hover:opacity-100 px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-medium hover:bg-amber-200 transition">
+                                      Trigger
+                                    </button>
+                                  )}
+                                  {ev.status === "TRIGGERED" && (
+                                    <button onClick={(e) => { e.stopPropagation(); completeAPCEEvent(ev.id); }}
+                                      className="opacity-0 group-hover:opacity-100 px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 transition">
+                                      Complete
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Meeting Stats */}
+                    <div className="p-4 bg-gray-50 border-t border-gray-200">
+                      <div className="flex items-center gap-6 text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-green-500" />
+                          <span className="text-gray-600">{completedEvents} Completed</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-amber-500" />
+                          <span className="text-gray-600">{triggeredEvents} In Progress</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-gray-300" />
+                          <span className="text-gray-600">{apceEvents.length - completedEvents - triggeredEvents} Pending</span>
+                        </div>
+                        <div className="ml-auto text-xs text-gray-400">
+                          Agenda Items: {meeting.agendaItems?.length || 0}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
    BOARD MANAGEMENT VIEW COMPONENT
    ══════════════════════════════════════════════════════════ */
 
@@ -3331,46 +3791,9 @@ function BoardManagementView() {
         </div>
       )}
 
-      {/* Calendar Sub-Tab */}
+      {/* Calendar Sub-Tab — Live Meeting Calendar with APCE */}
       {boardTab === "calendar" && (
-        <div className="p-6">
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-gray-600 font-medium">Date</th>
-                  <th className="px-4 py-3 text-left text-gray-600 font-medium">Event</th>
-                  <th className="px-4 py-3 text-left text-gray-600 font-medium">Type</th>
-                  <th className="px-4 py-3 text-left text-gray-600 font-medium">Responsible</th>
-                  <th className="px-4 py-3 text-left text-gray-600 font-medium">Status</th>
-                  <th className="px-4 py-3 text-left text-gray-600 font-medium">Deliverable</th>
-                </tr>
-              </thead>
-              <tbody>
-                {BOARD_CALENDAR_EVENTS.map((e, idx) => (
-                  <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-700 font-medium">{e.date}</td>
-                    <td className="px-4 py-3 text-gray-900">{e.event.substring(0, 40)}</td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700">{e.type}</span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">{e.responsible}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        e.status === "completed" ? "bg-green-100 text-green-700" :
-                        e.status === "upcoming" ? "bg-blue-100 text-blue-700" :
-                        "bg-gray-100 text-gray-700"
-                      }`}>
-                        {e.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700 text-xs">{e.deliverable}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <MeetingCalendarManager />
       )}
 
       {/* Organogram Sub-Tab */}

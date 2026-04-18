@@ -51,6 +51,27 @@ enum UserRole {
   SYSTEM_ADMINISTRATOR
 }
 
+enum MeetingStatus {
+  DRAFT
+  SCHEDULED
+  CALL_ISSUED
+  SUBMISSIONS_OPEN
+  SUBMISSIONS_CLOSED
+  AGENDA_APPROVED
+  PAPERS_CIRCULATED
+  IN_SESSION
+  CONCLUDED
+  MINUTES_DRAFTED
+  MINUTES_CONFIRMED
+}
+
+enum APCEEventStatus {
+  PENDING
+  TRIGGERED
+  COMPLETED
+  SKIPPED
+}
+
 // ============ Core Entities ============
 
 model User {
@@ -73,17 +94,77 @@ model Role {
 }
 
 model MeetingCalendar {
-  id              String   @id @default(cuid())
-  meetingNumber   Int      @unique
+  id              String        @id @default(cuid())
+  meetingNumber   Int           @unique
+  title           String?
   meetingDate     DateTime
   meetingLocation String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  status          MeetingStatus @default(DRAFT)
+  onlineMeetingLink String?
+  quorum          String?
+  callNoticeAt    DateTime?
+  cutoffAt        DateTime?
+  vcApprovalDueAt DateTime?
+  circulationAt   DateTime?
+  queryCloseAt    DateTime?
+  concludedAt     DateTime?
+  minutesDraftDueAt DateTime?
+  minutesConfirmAt  DateTime?
+  createdBy       String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   agendaItems      AgendaItem[]
   workingPapers    WorkingPaper[]
   resolutions      FeederBodyResolution[]
   decisions        Decision[]
+  apceEvents       APCEEvent[]
+
+  @@index([status])
+  @@index([meetingDate])
+}
+
+model APCEEvent {
+  id                String          @id @default(cuid())
+  meetingCalendarId String
+  eventCode         String
+  eventName         String
+  scheduledAt       DateTime
+  triggeredAt       DateTime?
+  status            APCEEventStatus @default(PENDING)
+  offsetDays        Int
+  description       String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  meetingCalendar   MeetingCalendar @relation(fields: [meetingCalendarId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  notifications     InAppNotification[]
+
+  @@unique([meetingCalendarId, eventCode])
+  @@index([meetingCalendarId])
+  @@index([eventCode])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model InAppNotification {
+  id            String    @id @default(cuid())
+  recipientRole UserRole
+  title         String
+  message       String
+  type          String    @default("info")
+  read          Boolean   @default(false)
+  readAt        DateTime?
+  apceEventId   String?
+  meetingCalendarId String?
+  createdAt     DateTime  @default(now())
+
+  apceEvent     APCEEvent? @relation(fields: [apceEventId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([recipientRole])
+  @@index([read])
+  @@index([createdAt])
+  @@index([apceEventId])
 }
 
 model AgendaItem {
