@@ -9,7 +9,7 @@ pnpm install --no-frozen-lockfile
 
 echo "=== Generating Prisma client ==="
 cd apps/web
-npx prisma generate --schema=../../prisma/schema.prisma
+npx prisma@5.22.0 generate --schema=../../prisma/schema.prisma
 
 echo "=== Building Next.js ==="
 npx next build
