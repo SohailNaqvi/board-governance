@@ -2766,6 +2766,389 @@ const formatDate = (isoString) => {
 };
 
 /* ══════════════════════════════════════════════════════════
+   SUBMISSION WORKSPACE — SLICE 3 (Proposer Submission)
+   Implements Stage 2 of the seven-stage workflow:
+   - Submission form with category, background, issue, proposed resolution
+   - Prerequisite enforcement: academic items need AC resolution ID
+   - DRAFT → SUBMITTED state transition with validation
+   ══════════════════════════════════════════════════════════ */
+
+const SUBMISSION_CATEGORIES = {
+  academic:   { label: "Academic", color: "#3b82f6", icon: "🎓", prereq: "Academic Council (AC) resolution required" },
+  financial:  { label: "Financial", color: "#ef4444", icon: "💰", prereq: "Finance & Planning Committee (F&PC) resolution required" },
+  hr:         { label: "HR / Personnel", color: "#ec4899", icon: "👤", prereq: "ASRB resolution required" },
+  governance: { label: "Governance", color: "#6b7280", icon: "🏛️", prereq: null },
+  other:      { label: "Other", color: "#9ca3af", icon: "📋", prereq: null },
+};
+
+function SubmissionWorkspace() {
+  const [submissions, setSubmissions] = useState([]);
+  const [openMeetings, setOpenMeetings] = useState([]);
+  const [resolutions, setResolutions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [prereqMessage, setPrereqMessage] = useState(null);
+  const [prereqValid, setPrereqValid] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  const [form, setForm] = useState({
+    meetingCalendarId: "",
+    title: "",
+    category: "",
+    background: "",
+    issueForConsideration: "",
+    proposedResolution: "",
+    proposedBy: "Vice Chancellor",
+    feederResolutionRef: "",
+  });
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/board/submissions");
+      if (res.ok) {
+        const data = await res.json();
+        setSubmissions(data.items || []);
+        setOpenMeetings(data.openMeetings || []);
+        setResolutions(data.resolutions || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch submissions:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const resetForm = () => {
+    setForm({ meetingCalendarId: "", title: "", category: "", background: "", issueForConsideration: "", proposedResolution: "", proposedBy: "Vice Chancellor", feederResolutionRef: "" });
+    setPrereqMessage(null);
+    setPrereqValid(null);
+  };
+
+  const handleCategoryChange = (cat) => {
+    setForm(p => ({ ...p, category: cat, feederResolutionRef: "" }));
+    const prereq = SUBMISSION_CATEGORIES[cat]?.prereq;
+    if (prereq) {
+      setPrereqMessage(prereq);
+      setPrereqValid(null);
+    } else {
+      setPrereqMessage(null);
+      setPrereqValid(true);
+    }
+  };
+
+  const submitProposal = async (asDraft = false) => {
+    if (!form.meetingCalendarId || !form.title || !form.category) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/board/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPrereqMessage(data.prerequisite?.message || null);
+        setPrereqValid(data.prerequisite?.valid ?? true);
+        setShowForm(false);
+        resetForm();
+        await fetchData();
+      } else {
+        setPrereqMessage(data.error || "Submission failed");
+        setPrereqValid(false);
+      }
+    } catch (e) {
+      console.error("Failed to submit:", e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitDraft = async (itemId) => {
+    try {
+      const res = await fetch("/api/board/submissions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: itemId, action: "submit" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchData();
+      } else {
+        alert(data.prerequisite?.message || data.error || "Cannot submit — prerequisites not met");
+      }
+    } catch (e) {
+      console.error("Failed to submit draft:", e);
+    }
+  };
+
+  const withdrawItem = async (itemId) => {
+    try {
+      await fetch("/api/board/submissions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: itemId, action: "withdraw" }),
+      });
+      await fetchData();
+    } catch (e) {
+      console.error("Failed to withdraw:", e);
+    }
+  };
+
+  const parseDesc = (desc) => {
+    try { return JSON.parse(desc || "{}"); } catch { return {}; }
+  };
+
+  const draftItems = submissions.filter(s => s.status === "DRAFT");
+  const submittedItems = submissions.filter(s => s.status === "SUBMITTED");
+  const otherItems = submissions.filter(s => !["DRAFT", "SUBMITTED"].includes(s.status));
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Send className="w-6 h-6 text-blue-600" />
+            Proposal Submission Workspace
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">Submit proposals for Syndicate consideration. Academic, financial, and HR items require feeder-body resolution clearance.</p>
+        </div>
+        <button onClick={() => { setShowForm(!showForm); if (!showForm) resetForm(); }}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm">
+          <Plus className="w-4 h-4" /> New Proposal
+        </button>
+      </div>
+
+      {/* Submission Form */}
+      {showForm && (
+        <div className="bg-white rounded-lg border-2 border-blue-200 p-6">
+          <h3 className="font-bold text-gray-900 text-lg mb-4">Submit New Proposal</h3>
+
+          {/* Meeting Selection */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Target Meeting *</label>
+            {openMeetings.length > 0 ? (
+              <select value={form.meetingCalendarId} onChange={e => setForm(p => ({...p, meetingCalendarId: e.target.value}))}
+                className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">Select a meeting...</option>
+                {openMeetings.map(m => (
+                  <option key={m.id} value={m.id}>{m.title || `Meeting #${m.meetingNumber}`} — {new Date(m.meetingDate).toLocaleDateString()}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                No meetings currently accepting submissions. Schedule a meeting in the Calendar tab first.
+              </div>
+            )}
+          </div>
+
+          {/* Title and Category */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Proposal Title *</label>
+              <input type="text" value={form.title} onChange={e => setForm(p => ({...p, title: e.target.value}))}
+                placeholder="e.g. Approval of revised fee structure for MSc programmes" className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+              <div className="flex gap-2 flex-wrap">
+                {Object.entries(SUBMISSION_CATEGORIES).map(([key, cat]) => (
+                  <button key={key} onClick={() => handleCategoryChange(key)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition border ${form.category === key ? "border-2" : "border-gray-200 hover:border-gray-300"}`}
+                    style={form.category === key ? { backgroundColor: cat.color + "15", borderColor: cat.color, color: cat.color } : {}}>
+                    {cat.icon} {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Prerequisite Warning / Resolution Input */}
+          {form.category && SUBMISSION_CATEGORIES[form.category]?.prereq && (
+            <div className={`mb-4 p-4 rounded-lg border ${prereqValid === true ? "bg-green-50 border-green-200" : prereqValid === false ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
+              <div className="flex items-start gap-3">
+                <AlertTriangle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${prereqValid === true ? "text-green-600" : prereqValid === false ? "text-red-600" : "text-amber-600"}`} />
+                <div className="flex-1">
+                  <div className={`text-sm font-medium ${prereqValid === true ? "text-green-800" : prereqValid === false ? "text-red-800" : "text-amber-800"}`}>
+                    Prerequisite: {SUBMISSION_CATEGORIES[form.category].prereq}
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Items in this category require prior clearance from the relevant feeder body. Enter the resolution number below. Without a valid reference, the item will be saved as DRAFT only.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <input type="text" value={form.feederResolutionRef} onChange={e => setForm(p => ({...p, feederResolutionRef: e.target.value}))}
+                      placeholder="e.g. 42 (resolution number)" className="flex-1 border rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  {prereqMessage && (
+                    <div className={`text-xs mt-2 ${prereqValid ? "text-green-700" : "text-red-700"}`}>{prereqMessage}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Structured Fields */}
+          <div className="space-y-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Background</label>
+              <textarea value={form.background} onChange={e => setForm(p => ({...p, background: e.target.value}))}
+                rows={3} placeholder="Provide context and history for this proposal..."
+                className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Issue for Consideration</label>
+              <textarea value={form.issueForConsideration} onChange={e => setForm(p => ({...p, issueForConsideration: e.target.value}))}
+                rows={3} placeholder="What specific matter requires the Syndicate's attention?"
+                className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Proposed Resolution</label>
+              <textarea value={form.proposedResolution} onChange={e => setForm(p => ({...p, proposedResolution: e.target.value}))}
+                rows={2} placeholder="What action is being proposed for the Syndicate to approve?"
+                className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Proposed By</label>
+              <input type="text" value={form.proposedBy} onChange={e => setForm(p => ({...p, proposedBy: e.target.value}))}
+                className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+
+          {/* Submit Buttons */}
+          <div className="flex gap-3">
+            <button onClick={() => submitProposal(false)} disabled={!form.meetingCalendarId || !form.title || !form.category || submitting}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium text-sm flex items-center gap-2">
+              {submitting ? "Submitting..." : <><Send className="w-4 h-4" /> Submit Proposal</>}
+            </button>
+            <button onClick={() => { setShowForm(false); resetForm(); }}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm">Cancel</button>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            If prerequisites are not met, the item will be saved as DRAFT. You can add the resolution reference later and resubmit.
+          </p>
+        </div>
+      )}
+
+      {/* Draft Items */}
+      {draftItems.length > 0 && (
+        <div>
+          <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <Edit3 className="w-4 h-4 text-amber-500" />
+            Drafts — Awaiting Prerequisites ({draftItems.length})
+          </h3>
+          <div className="space-y-3">
+            {draftItems.map(item => {
+              const desc = parseDesc(item.description);
+              const cat = SUBMISSION_CATEGORIES[desc.category] || SUBMISSION_CATEGORIES.other;
+              return (
+                <div key={item.id} className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ backgroundColor: cat.color + "15", color: cat.color }}>{cat.label}</span>
+                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-700">DRAFT</span>
+                      </div>
+                      <div className="font-medium text-gray-900 mt-1">{item.title}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Proposed by {item.proposedBy} • For {item.meetingCalendar?.title || `Meeting #${item.meetingCalendar?.meetingNumber}`}
+                      </div>
+                      {desc.prerequisiteMessage && (
+                        <div className="text-xs text-amber-700 mt-2 bg-amber-100 rounded p-2">
+                          <AlertTriangle className="w-3 h-3 inline mr-1" />{desc.prerequisiteMessage}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => submitDraft(item.id)} className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700">Submit</button>
+                      <button onClick={() => withdrawItem(item.id)} className="px-3 py-1 bg-gray-200 text-gray-600 rounded text-xs font-medium hover:bg-gray-300">Withdraw</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Submitted Items */}
+      {submittedItems.length > 0 && (
+        <div>
+          <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-green-500" />
+            Submitted — In Registrar Queue ({submittedItems.length})
+          </h3>
+          <div className="space-y-3">
+            {submittedItems.map(item => {
+              const desc = parseDesc(item.description);
+              const cat = SUBMISSION_CATEGORIES[desc.category] || SUBMISSION_CATEGORIES.other;
+              return (
+                <div key={item.id} className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ backgroundColor: cat.color + "15", color: cat.color }}>{cat.label}</span>
+                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700">SUBMITTED</span>
+                        {desc.prerequisiteStatus === "CLEARED" && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-600">Prerequisite Cleared</span>
+                        )}
+                      </div>
+                      <div className="font-medium text-gray-900 mt-1">{item.title}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Proposed by {item.proposedBy} • Submitted {item.submittedDate ? new Date(item.submittedDate).toLocaleDateString() : ""} • For {item.meetingCalendar?.title || `Meeting #${item.meetingCalendar?.meetingNumber}`}
+                      </div>
+                    </div>
+                    <button onClick={() => withdrawItem(item.id)} className="px-3 py-1 bg-gray-200 text-gray-600 rounded text-xs font-medium hover:bg-gray-300">Withdraw</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Other Items (Vetted, Approved, etc.) */}
+      {otherItems.length > 0 && (
+        <div>
+          <h3 className="font-bold text-gray-900 mb-3">Other Items ({otherItems.length})</h3>
+          <div className="space-y-2">
+            {otherItems.map(item => {
+              const desc = parseDesc(item.description);
+              const cat = SUBMISSION_CATEGORIES[desc.category] || SUBMISSION_CATEGORIES.other;
+              return (
+                <div key={item.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ backgroundColor: cat.color + "15", color: cat.color }}>{cat.label}</span>
+                    <span className="px-2 py-0.5 rounded text-xs font-bold bg-gray-100 text-gray-600">{item.status}</span>
+                    <span className="font-medium text-sm text-gray-900">{item.title}</span>
+                    <span className="text-xs text-gray-400 ml-auto">{item.proposedBy}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && submissions.length === 0 && !showForm && (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+          <Send className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 font-medium">No proposals yet</p>
+          <p className="text-sm text-gray-400 mt-1">Click "New Proposal" to submit your first item for Syndicate consideration</p>
+        </div>
+      )}
+
+      {loading && (
+        <div className="text-center py-8 text-gray-500">Loading submissions...</div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
    MEETING CALENDAR MANAGER — SLICE 2 (APCE Integration)
    Creates meetings, auto-generates 10 APCE events with backward-derived
    deadlines, and dispatches notifications to relevant roles.
@@ -3263,6 +3646,7 @@ function BoardManagementView() {
   const boardSubTabs = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "actions", label: "Action Tracker", icon: ClipboardCheck },
+    { id: "submissions", label: "Submissions", icon: Send },
     { id: "agenda", label: "Agenda Builder", icon: FileText },
     { id: "committees", label: "Committees", icon: Users },
     { id: "kpis", label: "Board KPIs", icon: TrendingUp },
@@ -3463,6 +3847,9 @@ function BoardManagementView() {
           </div>
         </div>
       )}
+
+      {/* Submissions Workspace Sub-Tab — Slice 3 */}
+      {boardTab === "submissions" && <SubmissionWorkspace />}
 
       {/* Agenda Builder Sub-Tab — Interactive */}
       {boardTab === "agenda" && <AgendaBuilderInteractive />}
