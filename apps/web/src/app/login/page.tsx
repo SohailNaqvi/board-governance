@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAllSeedUsers } from "@/lib/auth";
+import { getAllSeedUsers } from "../../lib/auth";
 
 export default function LoginPage(): React.ReactNode {
   const router = useRouter();
