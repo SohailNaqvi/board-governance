@@ -22,7 +22,7 @@ mv pnpm-lock.yaml.bak pnpm-lock.yaml
 mv pnpm-workspace.yaml.bak pnpm-workspace.yaml
 
 echo "=== Running Slice 2 migration ==="
-npm install pg --no-save
+pnpm add pg -w --no-lockfile
 node prisma/migrate-slice2.mjs
 
 echo "=== Building Next.js ==="
