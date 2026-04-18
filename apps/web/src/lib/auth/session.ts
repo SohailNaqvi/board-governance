@@ -1,5 +1,5 @@
 import { jwtVerify, SignJWT } from "jose";
-import type { UserRole } from "@ums/domain";
+import type { UserRole } from "./seed-users";
 
 const secret = new TextEncoder().encode(
   process.env.JWT_SECRET || "dev-secret-change-in-production"

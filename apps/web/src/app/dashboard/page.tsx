@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { UserRole } from "@ums/domain";
+type UserRole = "AUTHORIZED_PROPOSER" | "FEEDER_BODY_SECRETARY" | "REGISTRAR" | "TREASURER_LEGAL" | "VICE_CHANCELLOR" | "SYNDICATE_MEMBER" | "SYSTEM_ADMINISTRATOR";
 
 interface CurrentUser {
   userId: string;
