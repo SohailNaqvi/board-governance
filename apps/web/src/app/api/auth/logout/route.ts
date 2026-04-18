@@ -10,7 +10,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     response.cookies.delete("session");
 
-    logger.info("User logged out");
+    logger.info({}, "User logged out");
 
     response.headers.set("Location", "/login");
 

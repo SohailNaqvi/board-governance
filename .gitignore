@@ -13,3 +13,4 @@ out
 prisma/node_modules
 prisma/package.json
 prisma/package-lock.json
+.github/
