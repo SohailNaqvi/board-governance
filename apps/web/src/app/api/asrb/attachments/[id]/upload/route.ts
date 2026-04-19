@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import prisma from "../../../../../lib/prisma";
-import { verifyUploadToken } from "../../../../../lib/asrb/intake-service";
-import logger from "../../../../../lib/logger";
+import prisma from "../../../../../../lib/prisma";
+import { verifyUploadToken } from "../../../../../../lib/asrb/intake-service";
+import logger from "../../../../../../lib/logger";
 
 interface ProblemDetail {
   type: string;
