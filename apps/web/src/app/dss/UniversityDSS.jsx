@@ -3178,6 +3178,333 @@ const MEETING_STATUS_COLORS = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Slice 5: VC Strategic Cockpit & Draft Agenda Approval
+// Per Section 2.4: VC's Approval of the Draft Agenda
+// ═══════════════════════════════════════════════════════════════════════════════
+function VCStrategicCockpit() {
+  const [meetings, setMeetings] = useState([]);
+  const [selectedMeetingId, setSelectedMeetingId] = useState("");
+  const [items, setItems] = useState([]);
+  const [suggestedOrder, setSuggestedOrder] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [meeting, setMeeting] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [expandedItem, setExpandedItem] = useState(null);
+  const [actionModal, setActionModal] = useState(null);
+  const [actionNotes, setActionNotes] = useState("");
+  const [processing, setProcessing] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [customOrder, setCustomOrder] = useState([]);
+
+  const fetchCockpit = useCallback(async () => {
+    try {
+      const params = selectedMeetingId ? `?meetingId=${selectedMeetingId}` : "";
+      const res = await fetch(`/api/board/vc-cockpit${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMeetings(data.meetings || []);
+        setItems(data.items || []);
+        setSuggestedOrder(data.suggestedOrder || []);
+        setStats(data.stats || null);
+        setMeeting(data.meeting || null);
+        setCustomOrder(data.items?.map(i => i.id) || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch cockpit:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedMeetingId]);
+
+  useEffect(() => { fetchCockpit(); }, [fetchCockpit]);
+
+  const showToast = (msg, success = true) => {
+    setToast({ message: msg, success });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const handleAction = async (actionType, itemId, extra = {}) => {
+    setProcessing(true);
+    try {
+      const payload = { action: actionType, id: itemId, notes: actionNotes, ...extra };
+      const res = await fetch("/api/board/vc-cockpit", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Item ${data.action || actionType} successfully`);
+        setActionModal(null);
+        setActionNotes("");
+        fetchCockpit();
+      } else {
+        showToast(data.error || "Action failed", false);
+      }
+    } catch (e) {
+      showToast("Network error", false);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const approveFullAgenda = async () => {
+    if (!selectedMeetingId) return;
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/board/vc-cockpit", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve_agenda", meetingId: selectedMeetingId, notes: actionNotes }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Agenda approved! ${data.itemsApproved} items approved for agenda.`);
+        setActionModal(null);
+        setActionNotes("");
+        fetchCockpit();
+      } else {
+        showToast(data.error || "Failed to approve agenda", false);
+      }
+    } catch (e) {
+      showToast("Network error", false);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const saveReorder = async () => {
+    if (!selectedMeetingId || customOrder.length === 0) return;
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/board/vc-cockpit", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reorder", meetingId: selectedMeetingId, orderedIds: customOrder }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Agenda reordered (${data.count} items)`);
+        fetchCockpit();
+      } else {
+        showToast(data.error, false);
+      }
+    } catch (e) {
+      showToast("Network error", false);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const moveItem = (fromIdx, direction) => {
+    const toIdx = fromIdx + direction;
+    if (toIdx < 0 || toIdx >= customOrder.length) return;
+    const newOrder = [...customOrder];
+    [newOrder[fromIdx], newOrder[toIdx]] = [newOrder[toIdx], newOrder[fromIdx]];
+    setCustomOrder(newOrder);
+  };
+
+  const applySuggestedOrder = () => {
+    setCustomOrder([...suggestedOrder]);
+    showToast("Applied DSS suggested ordering");
+  };
+
+  const getSeverityColor = (s) => s === "high" ? "#ef4444" : s === "medium" ? "#f59e0b" : "#10b981";
+  const getRiskBg = (l) => l === "high" ? "bg-red-50 border-red-200" : l === "medium" ? "bg-yellow-50 border-yellow-200" : "bg-green-50 border-green-200";
+
+  const displayItems = customOrder.map(id => items.find(i => i.id === id)).filter(Boolean);
+  const vettedCount = items.filter(i => i.status === "VETTED").length;
+
+  if (loading) return <div className="p-8 text-center text-gray-500">Loading VC Cockpit...</div>;
+
+  return (
+    <div className="p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <Monitor className="w-5 h-5 text-indigo-600" /> VC Strategic Cockpit
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">Review, prioritize, and approve the draft agenda</p>
+        </div>
+        {selectedMeetingId && vettedCount > 0 && (
+          <button onClick={() => setActionModal({ type: "approve_agenda" })} className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" /> Approve Full Agenda ({vettedCount})
+          </button>
+        )}
+      </div>
+
+      {/* Meeting Selector */}
+      <div className="bg-gray-50 rounded-lg p-3">
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full" value={selectedMeetingId} onChange={e => { setSelectedMeetingId(e.target.value); setLoading(true); setExpandedItem(null); }}>
+          <option value="">— Select a meeting —</option>
+          {meetings.map(m => (
+            <option key={m.id} value={m.id}>Meeting #{m.meetingNumber} — {m.title || new Date(m.meetingDate).toLocaleDateString()} ({m._count?.agendaItems || 0} items)</option>
+          ))}
+        </select>
+      </div>
+
+      {toast && (
+        <div className={`p-3 rounded-lg text-sm font-medium ${toast.success ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>{toast.message}</div>
+      )}
+
+      {!selectedMeetingId ? (
+        <div className="text-center py-16 text-gray-400">
+          <Monitor className="w-16 h-16 mx-auto mb-4 opacity-30" />
+          <p className="text-lg">Select a meeting to view the draft agenda</p>
+        </div>
+      ) : (
+        <>
+          {/* Stats */}
+          {stats && (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+              {[
+                { label: "Total", value: stats.totalItems, color: "#3b82f6", icon: FileText },
+                { label: "Vetted", value: stats.vetted, color: "#8b5cf6", icon: CheckCircle },
+                { label: "Approved", value: stats.approved, color: "#10b981", icon: Award },
+                { label: "Deferred", value: stats.deferred, color: "#f59e0b", icon: Clock },
+                { label: "Financial", value: stats.financialFlags, color: "#ef4444", icon: DollarSign },
+                { label: "Legal", value: stats.legalFlags, color: "#dc2626", icon: Scale },
+                { label: "High Risk", value: stats.highRisk, color: "#b91c1c", icon: AlertTriangle },
+                { label: "Completeness", value: `${stats.avgCompleteness}%`, color: stats.avgCompleteness >= 70 ? "#10b981" : "#f59e0b", icon: Target },
+              ].map((s, i) => (
+                <div key={i} className="bg-white border border-gray-200 rounded-lg p-3 text-center">
+                  <s.icon className="w-4 h-4 mx-auto mb-1" style={{ color: s.color }} />
+                  <div className="text-lg font-bold" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-xs text-gray-500">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Upcoming APCE Events */}
+          {stats?.upcomingEvents?.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <h4 className="text-sm font-semibold text-blue-700 mb-1 flex items-center gap-1"><Clock className="w-4 h-4" /> Upcoming Deadlines</h4>
+              <div className="flex gap-4 text-xs text-blue-600">{stats.upcomingEvents.map((ev, i) => (<span key={i}>{ev.name}: {new Date(ev.scheduledAt).toLocaleDateString()}</span>))}</div>
+            </div>
+          )}
+
+          {/* Ordering Controls */}
+          <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
+            <span className="text-sm text-gray-600 font-medium">Agenda Order:</span>
+            <button onClick={applySuggestedOrder} className="px-3 py-1 text-xs bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 flex items-center gap-1">
+              <Lightbulb className="w-3 h-3" /> DSS Suggested
+            </button>
+            <button onClick={saveReorder} disabled={processing} className="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1">
+              <Save className="w-3 h-3" /> Save Order
+            </button>
+          </div>
+
+          {/* Agenda Items */}
+          <div className="space-y-3">
+            {displayItems.length === 0 ? (
+              <div className="text-center py-12 text-gray-400"><FileText className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No vetted items for this meeting</p></div>
+            ) : displayItems.map((item, idx) => {
+              const isExpanded = expandedItem === item.id;
+              return (
+                <div key={item.id} className={`border rounded-lg overflow-hidden ${getRiskBg(item.riskLevel)}`}>
+                  <div className="p-4">
+                    <div className="flex items-start gap-3">
+                      {/* Reorder */}
+                      <div className="flex flex-col items-center gap-0.5 shrink-0 pt-1">
+                        <button onClick={() => moveItem(idx, -1)} disabled={idx === 0} className="text-gray-400 hover:text-gray-700 disabled:opacity-30"><ChevronUp className="w-4 h-4" /></button>
+                        <span className="text-xs font-bold text-gray-500 w-6 text-center">{idx + 1}</span>
+                        <button onClick={() => moveItem(idx, 1)} disabled={idx === displayItems.length - 1} className="text-gray-400 hover:text-gray-700 disabled:opacity-30"><ChevronDown className="w-4 h-4" /></button>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-gray-800">{item.title}</h3>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${item.status === "VETTED" ? "bg-purple-100 text-purple-700" : item.status === "APPROVED_FOR_AGENDA" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{item.status}</span>
+                          {item.category && <span className="text-xs px-1.5 py-0.5 bg-gray-200 rounded">{item.category}</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">By {item.proposedBy} • Completeness: {item.completeness}%</div>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {item.implications.map((imp, i) => (
+                            <span key={i} className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ color: getSeverityColor(imp.severity), backgroundColor: `${getSeverityColor(imp.severity)}15` }}>{imp.label}</span>
+                          ))}
+                          {item.precedents?.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">{item.precedents.length} precedent(s)</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => setExpandedItem(isExpanded ? null : item.id)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="View details"><Eye className="w-4 h-4" /></button>
+                        {item.status === "VETTED" && (
+                          <>
+                            <button onClick={() => handleAction("approve_item", item.id)} className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="Approve"><CheckCircle className="w-4 h-4" /></button>
+                            <button onClick={() => setActionModal({ type: "defer", item })} className="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded" title="Defer"><Clock className="w-4 h-4" /></button>
+                            <button onClick={() => setActionModal({ type: "return", item })} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Return"><ArrowDown className="w-4 h-4" /></button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {isExpanded && (
+                    <div className="border-t border-gray-200 bg-white p-4 space-y-3">
+                      {item.background && <div><span className="text-xs font-semibold text-gray-500 uppercase">Background</span><p className="text-sm text-gray-700 mt-0.5">{item.background}</p></div>}
+                      {item.issueForConsideration && <div><span className="text-xs font-semibold text-gray-500 uppercase">Issue for Consideration</span><p className="text-sm text-gray-700 mt-0.5">{item.issueForConsideration}</p></div>}
+                      {item.proposedResolution && <div><span className="text-xs font-semibold text-gray-500 uppercase">Proposed Resolution</span><p className="text-sm text-gray-700 mt-0.5">{item.proposedResolution}</p></div>}
+                      {item.feederTrail?.length > 0 && (
+                        <div>
+                          <span className="text-xs font-semibold text-gray-500 uppercase">Feeder Body Trail</span>
+                          {item.feederTrail.map((ft, i) => (<div key={i} className="text-sm text-gray-600 mt-0.5"><span className="font-medium">{ft.bodyCode}</span> Resolution #{ft.resolutionNumber}: {ft.text}</div>))}
+                        </div>
+                      )}
+                      {item.precedents?.length > 0 && (
+                        <div>
+                          <span className="text-xs font-semibold text-gray-500 uppercase">Precedent Decisions ({item.precedents.length})</span>
+                          <div className="space-y-1 mt-1">
+                            {item.precedents.map((p, i) => (
+                              <div key={i} className="text-sm bg-gray-50 p-2 rounded">
+                                <span className="font-medium text-gray-700">{p.title}</span>
+                                <span className="text-xs text-gray-400 ml-2">({p.similarity}% • Meeting #{p.meetingNumber} • {p.status})</span>
+                                {p.outcome && <div className="text-xs text-green-600 mt-0.5">Outcome: {p.outcome.substring(0, 150)}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Action Modal */}
+      {actionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setActionModal(null)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">
+              {actionModal.type === "defer" && "Defer Item"}
+              {actionModal.type === "return" && "Return to Proposer"}
+              {actionModal.type === "approve_agenda" && "Approve Full Agenda"}
+            </h3>
+            {actionModal.item && <p className="text-sm text-gray-500 mb-4">"{actionModal.item.title}"</p>}
+            {actionModal.type === "approve_agenda" && <p className="text-sm text-gray-600 mb-4">This will approve all {vettedCount} vetted items and update the meeting status to AGENDA_APPROVED.</p>}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">{actionModal.type === "return" ? "Reason (required)" : "Notes (optional)"}</label>
+              <textarea className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={3} placeholder={actionModal.type === "return" ? "Explain why..." : "Notes..."} value={actionNotes} onChange={e => setActionNotes(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => { setActionModal(null); setActionNotes(""); }} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+              <button
+                onClick={() => { if (actionModal.type === "approve_agenda") approveFullAgenda(); else handleAction(actionModal.type, actionModal.item?.id); }}
+                disabled={processing || (actionModal.type === "return" && !actionNotes)}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 ${actionModal.type === "approve_agenda" ? "bg-indigo-600 hover:bg-indigo-700" : actionModal.type === "defer" ? "bg-yellow-500 hover:bg-yellow-600" : "bg-red-500 hover:bg-red-600"}`}
+              >
+                {processing ? "Processing..." : actionModal.type === "approve_agenda" ? "Approve Agenda" : actionModal.type === "defer" ? "Defer Item" : "Return Item"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Slice 4: Registrar Triage Queue with DSS Intelligence Scoring
 // Per Section 2.3: Vetting and Consolidation
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -4129,6 +4456,7 @@ function BoardManagementView() {
     { id: "actions", label: "Action Tracker", icon: ClipboardCheck },
     { id: "submissions", label: "Submissions", icon: Send },
     { id: "triage", label: "Triage Queue", icon: Filter },
+    { id: "cockpit", label: "VC Cockpit", icon: Monitor },
     { id: "agenda", label: "Agenda Builder", icon: FileText },
     { id: "committees", label: "Committees", icon: Users },
     { id: "kpis", label: "Board KPIs", icon: TrendingUp },
@@ -4334,6 +4662,8 @@ function BoardManagementView() {
       {boardTab === "submissions" && <SubmissionWorkspace />}
 
       {boardTab === "triage" && <RegistrarTriageQueue />}
+
+      {boardTab === "cockpit" && <VCStrategicCockpit />}
 
       {/* Agenda Builder Sub-Tab — Interactive */}
       {boardTab === "agenda" && <AgendaBuilderInteractive />}
