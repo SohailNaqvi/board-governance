@@ -169,7 +169,7 @@ User Login → JWT Session → API Route → Database → Response
 
 ### Package Dependencies
 ```
-@board-governance/web
+@ums/web
 ├── @ums/domain       (enums, state machines)
 ├── @ums/source-data  (data abstraction)
 └── @ums/audit        (cryptographic verification)

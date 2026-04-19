@@ -144,7 +144,7 @@ The project uses pnpm workspaces with 4 workspace members:
 1. `@ums/domain` - Business logic
 2. `@ums/source-data` - Data abstraction
 3. `@ums/audit` - Audit system
-4. `@board-governance/web` - Next.js frontend
+4. `@ums/web` - Next.js frontend
 
 ### Database Entities (14 Total)
 1. User - System users
