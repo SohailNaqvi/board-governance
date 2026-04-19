@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CaseType, CaseUrgency } from "@board-governance/domain/enums";
+import { CaseType, CaseUrgency } from "@ums/domain";
 
 // Attachment metadata schema
 const AttachmentMetadataSchema = z.object({

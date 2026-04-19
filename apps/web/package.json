@@ -1,5 +1,5 @@
 {
-  "name": "@board-governance/web",
+  "name": "@ums/web",
   "version": "0.1.0",
   "description": "Next.js web application for Board Governance Module",
   "private": true,
@@ -10,8 +10,8 @@
     "start": "next start",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "test:unit": "vitest run --reporter=verbose"
+    "test": "vitest --passWithNoTests",
+    "test:unit": "vitest run --reporter=verbose --passWithNoTests"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",

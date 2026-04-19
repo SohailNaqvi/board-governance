@@ -36,6 +36,23 @@ pnpm db:migrate
 
 Commit the migration files to version control.
 
+## Package Scope Convention
+
+All internal workspace packages **must** use the `@ums/*` scope. This is the canonical scope for the University Management System monorepo.
+
+| Package | Name |
+|---------|------|
+| Domain logic | `@ums/domain` |
+| Data abstraction | `@ums/source-data` |
+| Audit system | `@ums/audit` |
+| Web application | `@ums/web` |
+
+**Rules:**
+- Never introduce a new package scope (e.g., `@board-governance/*`, `@university/*`) without an approved ADR.
+- All imports of workspace packages must use the `@ums/*` prefix.
+- The `transpilePackages` array in `next.config.mjs` must include every `@ums/*` package imported by the web app.
+- The `apps/web/package.json` must list every `@ums/*` package it imports under `dependencies` with `"workspace:*"`.
+
 ## Architecture
 
 See `docs/adr/` for decisions on key design choices. When making significant architectural changes, consider documenting with a new ADR.
