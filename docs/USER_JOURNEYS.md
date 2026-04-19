@@ -133,3 +133,51 @@
 | 8 | Stage 7: Post-Meeting | Registrar/VC | *(Future)* Minutes, decisions, ATR tracking |
 | 9 | Intelligence | System | *(Future)* ML classifiers, advanced scoring |
 | 10 | Compliance | Registrar | *(Future)* Regulatory export, audit trail |
+
+---
+
+## Journey 6: Working Paper Authoring (Slice 6)
+
+**Actor:** Registrar Office
+
+1. **Open Working Papers** — Navigate to Board Governance → Agenda Builder → Stage 6: Working Papers.
+2. **View Awaiting Items** — Amber panel shows approved agenda items that don't yet have working papers.
+3. **Instantiate Paper** — Click "Create" on an individual item, or "Create All" for bulk instantiation.
+4. **Auto-Population** — System auto-populates sections from the agenda item:
+   - Item Reference (title, meeting, date, proposer, category)
+   - Feeder Body Resolution (if linked)
+   - Background & Context (from submission)
+   - Issue for Consideration (from submission)
+   - Financial Implications (auto-detected from keywords: budget, PKR, expenditure, etc.)
+   - Prior Related Decisions (24-month lookback for similar items)
+   - Proposed Resolution (from submission)
+5. **Complete Manual Sections** — Registrar fills remaining required sections:
+   - Analysis & Discussion
+   - Recommendations
+   - Legal & Regulatory Implications (if applicable)
+   - List of Annexures
+6. **Section Completeness** — Progress bar tracks required vs filled sections. All required sections must have >10 characters.
+7. **Save Progress** — Status moves from INSTANTIATED → IN_AUTHORING on first edit.
+8. **Submit for Review** — Blocked unless all required sections are complete (returns 422 with missing list).
+9. **Review Workflow:**
+   - **Finalize** — Reviewer signs off. Status → FINALIZED. Notification to VC.
+   - **Return** — Reviewer sends back with mandatory comments. Status → IN_AUTHORING.
+10. **Paper Ready** — FINALIZED papers are ready for circulation (Stage 7, future).
+
+**Exit Conditions:** WorkingPaper in FINALIZED state with all sections complete.
+
+---
+
+## Updated Journey Map by Slice
+
+| Slice | Stage | Actor | Key Actions |
+|-------|-------|-------|-------------|
+| 2 | Stage 1: Call Notice | Registrar | Create meeting, APCE auto-generates deadlines |
+| 3 | Stage 2: Submission | Proposer | Submit item with prerequisite validation |
+| 4 | Stage 3: Vetting | Registrar | Triage with DSS scoring, vet/return/route |
+| 5 | Stage 4: VC Approval | Vice Chancellor | Review, reorder, approve/defer/return, bulk approve |
+| 6 | Stage 5: Working Papers | Registrar | Instantiate, auto-populate, author, review, finalize |
+| 7 | Stage 6: Circulation | Member | *(Future)* Read papers, submit queries, RSVP |
+| 8 | Stage 7: Post-Meeting | Registrar/VC | *(Future)* Minutes, decisions, ATR tracking |
+| 9 | Intelligence | System | *(Future)* ML classifiers, advanced scoring |
+| 10 | Compliance | Registrar | *(Future)* Regulatory export, audit trail |

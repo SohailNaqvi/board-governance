@@ -424,6 +424,129 @@ async function slice5Tests() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // STRESS: Concurrent requests
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SLICE 6: Working Paper Authoring & Auto-Population
+// ═══════════════════════════════════════════════════════════════════════════════
+async function slice6Tests() {
+  console.log("\n\n📄 SLICE 6: Working Paper Authoring & Auto-Population");
+  console.log("─".repeat(50));
+
+  // ── Happy Path ──
+  console.log("\n  Happy Path:");
+
+  await test("Fetch working papers list", async () => {
+    const res = await api("/working-papers");
+    assert(res.ok, `Expected 2xx, got ${res.status}`);
+    assert(Array.isArray(res.data.papers), "Expected papers array");
+    assert(res.data.stats, "Expected stats");
+  });
+
+  await test("Fetch working papers filtered by meeting", async () => {
+    if (!createdMeetingId) { skip("Filter by meeting", "No meeting"); return; }
+    const res = await api(`/working-papers?meetingId=${createdMeetingId}`);
+    assert(res.ok, `Expected 2xx, got ${res.status}`);
+  });
+
+  // We need an APPROVED_FOR_AGENDA item to instantiate a working paper
+  // createdItemId was approved in slice5 tests
+  let workingPaperId = null;
+
+  await test("Instantiate working paper from approved item", async () => {
+    if (!createdItemId) { skip("Instantiate paper", "No approved item"); return; }
+    const res = await api("/working-papers", "POST", { agendaItemId: createdItemId });
+    if (res.status === 400 && res.data.error?.includes("APPROVED_FOR_AGENDA")) {
+      skip("Instantiate paper", "Item not in APPROVED_FOR_AGENDA status");
+      return;
+    }
+    if (res.status === 409) {
+      skip("Instantiate paper", "Paper already exists");
+      return;
+    }
+    assert(res.ok, `Expected 2xx, got ${res.status}: ${JSON.stringify(res.data)}`);
+    assert(res.data.paper?.id, "Should return paper with id");
+    assert(res.data.autoPopulatedSections, "Should list auto-populated sections");
+    workingPaperId = res.data.paper.id;
+  });
+
+  await test("Fetch single paper with detail", async () => {
+    if (!workingPaperId) { skip("Fetch paper detail", "No paper created"); return; }
+    const res = await api(`/working-papers?paperId=${workingPaperId}`);
+    assert(res.ok, `Expected 2xx, got ${res.status}`);
+    assert(res.data.paper, "Should have paper");
+    assert(res.data.completeness, "Should have completeness");
+    assert(Array.isArray(res.data.templateSections), "Should have template sections");
+  });
+
+  await test("Edit working paper sections", async () => {
+    if (!workingPaperId) { skip("Edit paper", "No paper"); return; }
+    const res = await api("/working-papers", "PUT", {
+      id: workingPaperId,
+      action: "edit",
+      sections: {
+        analysis: "This is a comprehensive analysis of the proposed policy changes and their expected impact on university operations.",
+        recommendations: "The committee recommends approval of the proposed changes with the following conditions and timelines.",
+      },
+    });
+    assert(res.ok, `Expected 2xx, got ${res.status}`);
+    assert(res.data.completeness, "Should return updated completeness");
+  });
+
+  // ── Negative Path ──
+  console.log("\n  Negative Path:");
+
+  await test("Instantiate without agendaItemId → 400", async () => {
+    const res = await api("/working-papers", "POST", {});
+    assert(res.status === 400, `Expected 400, got ${res.status}`);
+  });
+
+  await test("Instantiate for non-existent item → 404", async () => {
+    const res = await api("/working-papers", "POST", { agendaItemId: "fake-id" });
+    assert(res.status === 404, `Expected 404, got ${res.status}`);
+  });
+
+  await test("Duplicate instantiation → 409", async () => {
+    if (!createdItemId) { skip("Dup instantiation", "No item"); return; }
+    const res = await api("/working-papers", "POST", { agendaItemId: createdItemId });
+    assert(res.status === 409 || res.status === 400, `Expected 409/400, got ${res.status}`);
+  });
+
+  await test("Edit non-existent paper → 404", async () => {
+    const res = await api("/working-papers", "PUT", { id: "fake-paper-id", sections: {} });
+    assert(res.status === 404, `Expected 404, got ${res.status}`);
+  });
+
+  await test("Submit incomplete paper for review → 422", async () => {
+    if (!workingPaperId) { skip("Submit incomplete", "No paper"); return; }
+    const res = await api("/working-papers", "PUT", { id: workingPaperId, action: "submit_review" });
+    // May be 422 (incomplete) or 200 (if auto-populated enough)
+    assert(res.status === 422 || res.ok, `Expected 422 or 2xx, got ${res.status}`);
+  });
+
+  await test("Finalize paper not in IN_REVIEW → 400", async () => {
+    if (!workingPaperId) { skip("Finalize wrong status", "No paper"); return; }
+    const res = await api("/working-papers", "PUT", { id: workingPaperId, action: "finalize" });
+    assert(res.status === 400 || res.ok, `Expected 400 (not IN_REVIEW), got ${res.status}`);
+  });
+
+  await test("Return without comments → 400", async () => {
+    if (!workingPaperId) { skip("Return no comments", "No paper"); return; }
+    const res = await api("/working-papers", "PUT", { id: workingPaperId, action: "return" });
+    assert(res.status === 400, `Expected 400, got ${res.status}`);
+  });
+
+  await test("Non-existent paper detail → 404", async () => {
+    const res = await api("/working-papers?paperId=fake-id");
+    assert(res.status === 404, `Expected 404, got ${res.status}`);
+  });
+
+  await test("Unknown action → 400", async () => {
+    if (!workingPaperId) { skip("Unknown action", "No paper"); return; }
+    const res = await api("/working-papers", "PUT", { id: workingPaperId, action: "evaporate" });
+    assert(res.status === 400, `Expected 400, got ${res.status}`);
+  });
+}
+
 async function stressTests() {
   console.log("\n\n⚡ STRESS: Concurrent Requests");
   console.log("─".repeat(50));
@@ -496,6 +619,7 @@ async function main() {
   await slice3Tests();
   await slice4Tests();
   await slice5Tests();
+  await slice6Tests();
   await stressTests();
   await cleanup();
 

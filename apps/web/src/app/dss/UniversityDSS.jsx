@@ -3190,6 +3190,7 @@ function AgendaWorkflow() {
     { id: "triage", label: "3. Triage Queue", icon: Filter, color: "#f59e0b" },
     { id: "cockpit", label: "4. VC Cockpit", icon: Monitor, color: "#6366f1" },
     { id: "builder", label: "5. Agenda Items", icon: FileText, color: "#10b981" },
+    { id: "papers", label: "6. Working Papers", icon: BookOpen, color: "#0891b2" },
   ];
 
   return (
@@ -3231,11 +3232,316 @@ function AgendaWorkflow() {
         {stage === "triage" && <RegistrarTriageQueue />}
         {stage === "cockpit" && <VCStrategicCockpit />}
         {stage === "builder" && <AgendaBuilderInteractive />}
+        {stage === "papers" && <WorkingPaperWorkspace />}
       </div>
     </div>
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Slice 6: Working Paper Authoring & Auto-Population
+// Per Section 2.5: Preparation of Working Papers
+// ═══════════════════════════════════════════════════════════════════════════════
+function WorkingPaperWorkspace() {
+  const [papers, setPapers] = useState([]);
+  const [approvedWithout, setApprovedWithout] = useState([]);
+  const [meetings, setMeetings] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [filterMeeting, setFilterMeeting] = useState("");
+  const [selectedPaper, setSelectedPaper] = useState(null);
+  const [paperDetail, setPaperDetail] = useState(null);
+  const [templateSections, setTemplateSections] = useState([]);
+  const [completeness, setCompleteness] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [editingSections, setEditingSections] = useState({});
+  const [processing, setProcessing] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [actionModal, setActionModal] = useState(null);
+  const [reviewComments, setReviewComments] = useState("");
+
+  const showToast = (msg, success = true) => { setToast({ message: msg, success }); setTimeout(() => setToast(null), 4000); };
+
+  const fetchPapers = useCallback(async () => {
+    try {
+      const params = filterMeeting ? `?meetingId=${filterMeeting}` : "";
+      const res = await fetch(`/api/board/working-papers${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPapers(data.papers || []);
+        setApprovedWithout(data.approvedWithoutPapers || []);
+        setMeetings(data.meetings || []);
+        setStats(data.stats || null);
+      }
+    } catch (e) { console.error("Failed to fetch papers:", e); }
+    finally { setLoading(false); }
+  }, [filterMeeting]);
+
+  useEffect(() => { fetchPapers(); }, [fetchPapers]);
+
+  const fetchPaperDetail = async (paperId) => {
+    setLoadingDetail(true);
+    try {
+      const res = await fetch(`/api/board/working-papers?paperId=${paperId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPaperDetail(data.paper);
+        setTemplateSections(data.templateSections || []);
+        setCompleteness(data.completeness);
+        let secs = {}; try { secs = JSON.parse(data.paper.content || "{}"); } catch {}
+        setEditingSections(secs);
+      }
+    } catch (e) { console.error("Failed to fetch paper detail:", e); }
+    finally { setLoadingDetail(false); }
+  };
+
+  const openPaper = (paper) => { setSelectedPaper(paper); fetchPaperDetail(paper.id); };
+  const closePaper = () => { setSelectedPaper(null); setPaperDetail(null); setEditingSections({}); };
+
+  const instantiatePaper = async (agendaItemId) => {
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/board/working-papers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agendaItemId }) });
+      const data = await res.json();
+      if (res.ok) { showToast(`Working paper created with ${data.autoPopulatedSections?.length || 0} auto-populated sections`); fetchPapers(); openPaper(data.paper); }
+      else showToast(data.error || "Failed", false);
+    } catch (e) { showToast("Network error", false); }
+    finally { setProcessing(false); }
+  };
+
+  const bulkInstantiate = async () => {
+    if (!filterMeeting) return;
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/board/working-papers", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "bulk_instantiate", meetingId: filterMeeting }) });
+      const data = await res.json();
+      if (res.ok) { showToast(`${data.created} working papers instantiated`); fetchPapers(); }
+      else showToast(data.error || "Failed", false);
+    } catch (e) { showToast("Network error", false); }
+    finally { setProcessing(false); }
+  };
+
+  const saveSections = async () => {
+    if (!selectedPaper) return;
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/board/working-papers", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: selectedPaper.id, action: "edit", sections: editingSections }) });
+      const data = await res.json();
+      if (res.ok) { showToast("Sections saved"); setCompleteness(data.completeness); fetchPapers(); }
+      else showToast(data.error || "Save failed", false);
+    } catch (e) { showToast("Network error", false); }
+    finally { setProcessing(false); }
+  };
+
+  const paperAction = async (action, extra = {}) => {
+    if (!selectedPaper) return;
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/board/working-papers", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: selectedPaper.id, action, ...extra }) });
+      const data = await res.json();
+      if (res.ok) { showToast(`Paper ${data.action || action}`); setActionModal(null); setReviewComments(""); fetchPapers(); fetchPaperDetail(selectedPaper.id); }
+      else showToast(data.error || "Action failed", false);
+    } catch (e) { showToast("Network error", false); }
+    finally { setProcessing(false); }
+  };
+
+  const STATUS_COLORS = { INSTANTIATED: "#9ca3af", IN_AUTHORING: "#3b82f6", IN_REVIEW: "#f59e0b", FINALIZED: "#10b981", CIRCULATED: "#6366f1", ARCHIVED: "#6b7280" };
+  const getCompletenessColor = (pct) => pct >= 80 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#ef4444";
+
+  if (loading) return <div className="p-8 text-center text-gray-500">Loading working papers...</div>;
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><BookOpen className="w-5 h-5 text-cyan-600" /> Working Paper Workspace</h2>
+          <p className="text-sm text-gray-500 mt-1">Author, review, and finalize working papers for approved agenda items</p>
+        </div>
+        {filterMeeting && approvedWithout.length > 0 && (
+          <button onClick={bulkInstantiate} disabled={processing} className="px-4 py-2 bg-cyan-600 text-white font-medium rounded-lg hover:bg-cyan-700 disabled:opacity-50 flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Create All ({approvedWithout.length})
+          </button>
+        )}
+      </div>
+
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          {[
+            { label: "Total", value: stats.total, color: "#3b82f6", icon: BookOpen },
+            { label: "Instantiated", value: stats.instantiated, color: "#9ca3af", icon: FileText },
+            { label: "Authoring", value: stats.inAuthoring, color: "#3b82f6", icon: Edit3 },
+            { label: "In Review", value: stats.inReview, color: "#f59e0b", icon: Eye },
+            { label: "Finalized", value: stats.finalized, color: "#10b981", icon: CheckCircle },
+            { label: "Circulated", value: stats.circulated, color: "#6366f1", icon: Send },
+            { label: "Awaiting", value: stats.awaitingInstantiation, color: "#ef4444", icon: Clock },
+            { label: "Avg Complete", value: `${stats.avgCompleteness}%`, color: stats.avgCompleteness >= 70 ? "#10b981" : "#f59e0b", icon: Target },
+          ].map((s, i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-lg p-3 text-center">
+              <s.icon className="w-4 h-4 mx-auto mb-1" style={{ color: s.color }} />
+              <div className="text-lg font-bold" style={{ color: s.color }}>{s.value}</div>
+              <div className="text-xs text-gray-500">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filter */}
+      <div className="bg-gray-50 rounded-lg p-3">
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full" value={filterMeeting} onChange={e => { setFilterMeeting(e.target.value); setLoading(true); closePaper(); }}>
+          <option value="">All Meetings</option>
+          {meetings.map(m => (<option key={m.id} value={m.id}>Meeting #{m.meetingNumber} — {m.title || new Date(m.meetingDate).toLocaleDateString()} ({m.status})</option>))}
+        </select>
+      </div>
+
+      {toast && (<div className={`p-3 rounded-lg text-sm font-medium ${toast.success ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>{toast.message}</div>)}
+
+      <div className="flex gap-4">
+        {/* Paper List */}
+        <div className={`${selectedPaper ? "w-2/5" : "w-full"} space-y-3 transition-all`}>
+          {/* Approved items awaiting instantiation */}
+          {approvedWithout.length > 0 && (
+            <div className="border border-amber-200 bg-amber-50 rounded-lg p-3">
+              <h4 className="text-sm font-semibold text-amber-700 mb-2 flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> Awaiting Working Paper ({approvedWithout.length})</h4>
+              {approvedWithout.map(item => (
+                <div key={item.id} className="flex items-center justify-between bg-white rounded p-2 mb-1 border border-amber-100">
+                  <div><div className="text-sm font-medium text-gray-800">{item.title}</div><div className="text-xs text-gray-500">#{item.itemNumber} • {item.proposedBy}</div></div>
+                  <button onClick={() => instantiatePaper(item.id)} disabled={processing} className="px-3 py-1 bg-cyan-600 text-white text-xs font-medium rounded-lg hover:bg-cyan-700 disabled:opacity-50">Create</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Existing papers */}
+          {papers.length === 0 && approvedWithout.length === 0 ? (
+            <div className="text-center py-12 text-gray-400"><BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" /><p className="text-lg font-medium">No working papers yet</p><p className="text-sm">Papers are created when agenda items are approved by the VC</p></div>
+          ) : papers.map(paper => (
+            <div key={paper.id} onClick={() => openPaper(paper)} className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${selectedPaper?.id === paper.id ? "border-cyan-500 bg-cyan-50" : "border-gray-200 bg-white"}`}>
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-gray-800 text-sm truncate">{paper.agendaItem?.title || paper.title}</h3>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ backgroundColor: STATUS_COLORS[paper.status] || "#6b7280" }}>{paper.status.replace(/_/g, " ")}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Item #{paper.agendaItem?.itemNumber} • By {paper.authoredBy}</div>
+                  {paper.meetingCalendar && <div className="text-xs text-gray-400">Meeting #{paper.meetingCalendar.meetingNumber}</div>}
+                </div>
+              </div>
+              {paper.completeness && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-gray-500">Sections</span>
+                    <span style={{ color: getCompletenessColor(paper.completeness.percentage) }} className="font-medium">{paper.completeness.percentage}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div className="h-1.5 rounded-full" style={{ width: `${paper.completeness.percentage}%`, backgroundColor: getCompletenessColor(paper.completeness.percentage) }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Paper Editor Panel */}
+        {selectedPaper && (
+          <div className="w-3/5 border border-gray-200 rounded-lg bg-white overflow-y-auto max-h-[80vh]">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-gray-800">{paperDetail?.agendaItem?.title || selectedPaper.title}</h3>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {paperDetail?.status && <span className="px-2 py-0.5 rounded-full text-white mr-2" style={{ backgroundColor: STATUS_COLORS[paperDetail.status] }}>{paperDetail.status.replace(/_/g, " ")}</span>}
+                    By {paperDetail?.authoredBy || selectedPaper.authoredBy}
+                    {paperDetail?.reviewedBy && <span> • Reviewed by {paperDetail.reviewedBy}</span>}
+                  </div>
+                </div>
+                <button onClick={closePaper} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              </div>
+              {/* Completeness bar */}
+              {completeness && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-gray-500">Required sections: {completeness.complete ? "All complete" : `${completeness.missing.length} missing`}</span>
+                    <span style={{ color: getCompletenessColor(completeness.percentage) }} className="font-bold">{completeness.percentage}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2"><div className="h-2 rounded-full" style={{ width: `${completeness.percentage}%`, backgroundColor: getCompletenessColor(completeness.percentage) }} /></div>
+                </div>
+              )}
+              {/* Action buttons */}
+              <div className="flex gap-2 mt-3">
+                {["INSTANTIATED", "IN_AUTHORING"].includes(paperDetail?.status) && (
+                  <>
+                    <button onClick={saveSections} disabled={processing} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"><Save className="w-3 h-3" /> Save</button>
+                    <button onClick={() => paperAction("submit_review")} disabled={processing} className="px-3 py-1.5 bg-amber-500 text-white text-xs font-medium rounded-lg hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1"><Send className="w-3 h-3" /> Submit for Review</button>
+                  </>
+                )}
+                {paperDetail?.status === "IN_REVIEW" && (
+                  <>
+                    <button onClick={() => setActionModal("finalize")} className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Finalize</button>
+                    <button onClick={() => setActionModal("return")} className="px-3 py-1.5 bg-red-500 text-white text-xs font-medium rounded-lg hover:bg-red-600 flex items-center gap-1"><ArrowDown className="w-3 h-3" /> Return</button>
+                  </>
+                )}
+                {paperDetail?.status === "FINALIZED" && <span className="text-sm text-green-600 font-medium flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Finalized — Ready for circulation</span>}
+              </div>
+              {paperDetail?.reviewComments && (
+                <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded p-2 text-xs text-yellow-700"><strong>Review comments:</strong> {paperDetail.reviewComments}</div>
+              )}
+            </div>
+
+            {loadingDetail ? (<div className="p-8 text-center text-gray-500">Loading paper...</div>) : (
+              <div className="p-4 space-y-4">
+                {templateSections.map(sec => {
+                  const val = editingSections[sec.key] || "";
+                  const isEditable = ["INSTANTIATED", "IN_AUTHORING"].includes(paperDetail?.status);
+                  const isEmpty = !val || val.trim().length <= 10;
+                  return (
+                    <div key={sec.key} className={`border rounded-lg p-3 ${isEmpty && sec.required ? "border-red-200 bg-red-50" : "border-gray-200"}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-sm font-semibold text-gray-700">
+                          {sec.label} {sec.required && <span className="text-red-500">*</span>}
+                        </label>
+                        <div className="flex items-center gap-1">
+                          {sec.autoPopulate && val && <span className="text-xs text-green-500">Auto-populated</span>}
+                          {isEmpty && sec.required && <span className="text-xs text-red-500">Required</span>}
+                        </div>
+                      </div>
+                      {isEditable ? (
+                        <textarea className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono" rows={val.split("\n").length > 3 ? Math.min(val.split("\n").length + 1, 10) : 3} value={val} onChange={e => setEditingSections(p => ({ ...p, [sec.key]: e.target.value }))} placeholder={`Enter ${sec.label.toLowerCase()}...`} />
+                      ) : (
+                        <div className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 rounded p-2">{val || <span className="text-gray-400 italic">Not provided</span>}</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Finalize / Return Modal */}
+      {actionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setActionModal(null)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">{actionModal === "finalize" ? "Finalize Working Paper" : "Return for Revision"}</h3>
+            <p className="text-sm text-gray-500 mb-4">{paperDetail?.agendaItem?.title || selectedPaper?.title}</p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">{actionModal === "return" ? "Review Comments (required)" : "Review Comments (optional)"}</label>
+              <textarea className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={3} value={reviewComments} onChange={e => setReviewComments(e.target.value)} placeholder={actionModal === "return" ? "Explain what needs revision..." : "Optional sign-off notes..."} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => { setActionModal(null); setReviewComments(""); }} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
+              <button onClick={() => paperAction(actionModal, { reviewComments, reviewedBy: "Registrar" })} disabled={processing || (actionModal === "return" && !reviewComments)} className={`px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 ${actionModal === "finalize" ? "bg-green-600 hover:bg-green-700" : "bg-red-500 hover:bg-red-600"}`}>
+                {processing ? "Processing..." : actionModal === "finalize" ? "Finalize" : "Return"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 // ═══════════════════════════════════════════════════════════════════════════════
 // Slice 5: VC Strategic Cockpit & Draft Agenda Approval
 // Per Section 2.4: VC's Approval of the Draft Agenda
