@@ -379,3 +379,134 @@ model AuditEvent {
   @@index([userId])
   @@index([timestamp])
 }
+
+// ============ ASRB Enums ============
+
+enum ASRBCaseStatus {
+  RECEIVED
+  COMPLIANCE_EVALUATED
+  VETTING
+  READY_FOR_AGENDA
+  ON_AGENDA
+  DECIDED
+  CLOSED
+  RETURNED
+  HELD
+  WITHDRAWN
+  URGENT_CIRCULATION
+  DEFERRED
+}
+
+enum CaseType {
+  SYNOPSIS_APPROVAL
+  GEC_CONSTITUTION
+  EXAMINER_APPOINTMENT
+  RESULT_APPROVAL
+  SUPERVISOR_CHANGE
+  TOPIC_CHANGE
+  EXTENSION_CANDIDATURE
+  LEAVE_ABSENCE
+  RESEARCH_PROJECT_APPROVAL
+  COMPREHENSIVE_RESULT
+  COURSEWORK_WAIVER
+  OTHER
+}
+
+enum CaseUrgency {
+  NORMAL
+  URGENT_CIRCULATION
+}
+
+enum FeederBodyType {
+  DGSC
+  FACULTY_BOARD
+}
+
+// ============ ASRB Core Entities ============
+
+model ASRBCase {
+  id                    String          @id @default(cuid())
+  caseType              CaseType
+  status                ASRBCaseStatus  @default(RECEIVED)
+  urgency               CaseUrgency     @default(NORMAL)
+  receiptReference      String          @unique
+  idempotencyKey        String
+  feederClientId        String
+  feederBodyType        FeederBodyType
+  feederBodyCode        String
+  feederResolutionBody  String?
+  feederResolutionNum   String?
+  feederResolutionDate  DateTime?
+  studentRegNo          String?
+  supervisorEmpId       String?
+  programmeCode         String?
+  casePayload           String          // JSON
+  receivedAt            DateTime        @default(now())
+  lastTransitionAt      DateTime        @default(now())
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  attachments           CaseAttachment[]
+  auditEvents           CaseAuditEvent[]
+  feederClient          FeederClient    @relation(fields: [feederClientId], references: [id])
+
+  @@unique([feederClientId, idempotencyKey])
+  @@index([status])
+  @@index([caseType])
+  @@index([feederClientId])
+  @@index([receiptReference])
+}
+
+model CaseAttachment {
+  id            String   @id @default(cuid())
+  caseId        String
+  filename      String
+  mimeType      String
+  sizeBytes     Int
+  docType       String
+  storageRef    String?
+  uploadToken   String?  @unique
+  uploadExpiry  DateTime?
+  uploaded      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  case          ASRBCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([uploadToken])
+}
+
+model CaseAuditEvent {
+  id          String   @id @default(cuid())
+  caseId      String
+  eventType   String
+  actorId     String
+  payloadHash String
+  details     String?  // JSON
+  occurredAt  DateTime @default(now())
+
+  case        ASRBCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([eventType])
+}
+
+model FeederClient {
+  id                  String         @id @default(cuid())
+  displayName         String
+  feederBodyType      FeederBodyType
+  feederBodyCode      String         @unique
+  apiKeyHash          String
+  permittedCaseTypes  String         // JSON array of CaseType
+  active              Boolean        @default(true)
+  rateLimitOverride   Int?
+  lastUsedAt          DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  cases               ASRBCase[]
+
+  @@index([apiKeyHash])
+  @@index([feederBodyCode])
+}

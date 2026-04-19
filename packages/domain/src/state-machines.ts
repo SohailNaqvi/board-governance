@@ -2,6 +2,7 @@ import {
   AgendaItemStatus,
   WorkingPaperStatus,
   ActionTakenEntryStatus,
+  ASRBCaseStatus,
 } from "./enums";
 
 // Transition matrices for state machines
@@ -107,6 +108,65 @@ export function canTransitionActionTakenEntry(
   return validTransitions.includes(to);
 }
 
+const asrbCaseTransitions: Record<ASRBCaseStatus, ASRBCaseStatus[]> = {
+  [ASRBCaseStatus.RECEIVED]: [
+    ASRBCaseStatus.COMPLIANCE_EVALUATED,
+    ASRBCaseStatus.RETURNED,
+    ASRBCaseStatus.WITHDRAWN,
+  ],
+  [ASRBCaseStatus.COMPLIANCE_EVALUATED]: [
+    ASRBCaseStatus.VETTING,
+    ASRBCaseStatus.RETURNED,
+    ASRBCaseStatus.URGENT_CIRCULATION,
+    ASRBCaseStatus.WITHDRAWN,
+  ],
+  [ASRBCaseStatus.VETTING]: [
+    ASRBCaseStatus.READY_FOR_AGENDA,
+    ASRBCaseStatus.RETURNED,
+    ASRBCaseStatus.HELD,
+    ASRBCaseStatus.WITHDRAWN,
+  ],
+  [ASRBCaseStatus.READY_FOR_AGENDA]: [
+    ASRBCaseStatus.ON_AGENDA,
+    ASRBCaseStatus.HELD,
+    ASRBCaseStatus.WITHDRAWN,
+  ],
+  [ASRBCaseStatus.ON_AGENDA]: [
+    ASRBCaseStatus.DECIDED,
+    ASRBCaseStatus.DEFERRED,
+    ASRBCaseStatus.WITHDRAWN,
+  ],
+  [ASRBCaseStatus.DECIDED]: [ASRBCaseStatus.CLOSED],
+  [ASRBCaseStatus.URGENT_CIRCULATION]: [
+    ASRBCaseStatus.DECIDED,
+    ASRBCaseStatus.RETURNED,
+    ASRBCaseStatus.WITHDRAWN,
+  ],
+  [ASRBCaseStatus.HELD]: [
+    ASRBCaseStatus.READY_FOR_AGENDA,
+    ASRBCaseStatus.WITHDRAWN,
+  ],
+  [ASRBCaseStatus.RETURNED]: [
+    ASRBCaseStatus.COMPLIANCE_EVALUATED,
+    ASRBCaseStatus.WITHDRAWN,
+  ],
+  [ASRBCaseStatus.DEFERRED]: [
+    ASRBCaseStatus.ON_AGENDA,
+    ASRBCaseStatus.WITHDRAWN,
+  ],
+  [ASRBCaseStatus.CLOSED]: [],
+  [ASRBCaseStatus.WITHDRAWN]: [],
+};
+
+export function canTransitionASRBCase(
+  from: ASRBCaseStatus,
+  to: ASRBCaseStatus
+): boolean {
+  const validTransitions = asrbCaseTransitions[from] || [];
+  return validTransitions.includes(to);
+}
+
 export const agendaItemTransitionMatrix = agendaItemTransitions;
 export const workingPaperTransitionMatrix = workingPaperTransitions;
 export const actionTakenEntryTransitionMatrix = actionTakenEntryTransitions;
+export const asrbCaseTransitionMatrix = asrbCaseTransitions;

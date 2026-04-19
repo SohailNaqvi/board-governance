@@ -24,6 +24,10 @@ echo "=== Running Slice 2 DB migration ==="
 # pg is in root dependencies, installed by pnpm install above
 node prisma/migrate-slice2.mjs
 
+echo "=== Running ASRB Slice 2 DB migration ==="
+# ASRB tables and feeder clients
+node prisma/migrate-asrb-slice2.mjs
+
 echo "=== Building Next.js ==="
 cd apps/web
 npx next build

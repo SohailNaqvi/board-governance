@@ -51,3 +51,33 @@ export interface IResolutionReader {
   getByBodyCode(code: string): Promise<ResolutionRecord[]>;
   getByNumber(number: number): Promise<ResolutionRecord | null>;
 }
+
+export interface StudentRecord {
+  id: string;
+  registrationNumber: string;
+  name: string;
+  programme: string;
+  department: string;
+  enrollmentDate: Date;
+  status: string;
+}
+
+export interface IStudentReader {
+  getByRegistrationNumber(regNo: string): Promise<StudentRecord | null>;
+}
+
+export interface SupervisorRecord {
+  id: string;
+  employeeId: string;
+  name: string;
+  department: string;
+  highestQualification: {
+    degree: string;
+    level: string;
+  };
+  activeSupervisionCount: number;
+}
+
+export interface ISupervisorReader {
+  getByEmployeeId(empId: string): Promise<SupervisorRecord | null>;
+}
