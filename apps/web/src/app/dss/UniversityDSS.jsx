@@ -3178,6 +3178,65 @@ const MEETING_STATUS_COLORS = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Agenda Workflow — Wrapper housing all seven-stage sub-components
+// Stages: Calendar → Submissions → Triage → VC Cockpit → Agenda Items
+// ═══════════════════════════════════════════════════════════════════════════════
+function AgendaWorkflow() {
+  const [stage, setStage] = useState("calendar");
+
+  const stages = [
+    { id: "calendar", label: "1. Calendar & APCE", icon: Calendar, color: "#3b82f6" },
+    { id: "submissions", label: "2. Submissions", icon: Send, color: "#8b5cf6" },
+    { id: "triage", label: "3. Triage Queue", icon: Filter, color: "#f59e0b" },
+    { id: "cockpit", label: "4. VC Cockpit", icon: Monitor, color: "#6366f1" },
+    { id: "builder", label: "5. Agenda Items", icon: FileText, color: "#10b981" },
+  ];
+
+  return (
+    <div className="w-full">
+      {/* Workflow Stage Navigation */}
+      <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+        <div className="px-4 pt-3 pb-0">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
+            {stages.map((s, idx) => {
+              const Icon = s.icon;
+              const isActive = stage === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setStage(s.id)}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all whitespace-nowrap ${
+                    isActive
+                      ? "border-current bg-white text-gray-800 shadow-sm"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                  }`}
+                  style={isActive ? { borderColor: s.color, color: s.color } : {}}
+                >
+                  <Icon className="w-4 h-4" />
+                  {s.label}
+                  {idx < stages.length - 1 && !isActive && (
+                    <ChevronRight className="w-3 h-3 ml-1 text-gray-300" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Stage Content */}
+      <div>
+        {stage === "calendar" && <MeetingCalendarManager />}
+        {stage === "submissions" && <SubmissionWorkspace />}
+        {stage === "triage" && <RegistrarTriageQueue />}
+        {stage === "cockpit" && <VCStrategicCockpit />}
+        {stage === "builder" && <AgendaBuilderInteractive />}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Slice 5: VC Strategic Cockpit & Draft Agenda Approval
 // Per Section 2.4: VC's Approval of the Draft Agenda
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -4453,10 +4512,6 @@ function BoardManagementView() {
 
   const boardSubTabs = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "calendar", label: "Calendar", icon: Calendar },
-    { id: "submissions", label: "Submissions", icon: Send },
-    { id: "triage", label: "Triage Queue", icon: Filter },
-    { id: "cockpit", label: "VC Cockpit", icon: Monitor },
     { id: "agenda", label: "Agenda Builder", icon: FileText },
     { id: "actions", label: "Action Tracker", icon: ClipboardCheck },
     { id: "decisions", label: "Decision Register", icon: Briefcase },
@@ -4658,15 +4713,8 @@ function BoardManagementView() {
         </div>
       )}
 
-      {/* Submissions Workspace Sub-Tab — Slice 3 */}
-      {boardTab === "submissions" && <SubmissionWorkspace />}
-
-      {boardTab === "triage" && <RegistrarTriageQueue />}
-
-      {boardTab === "cockpit" && <VCStrategicCockpit />}
-
-      {/* Agenda Builder Sub-Tab — Interactive */}
-      {boardTab === "agenda" && <AgendaBuilderInteractive />}
+      {/* Agenda Builder — Contains full seven-stage workflow */}
+      {boardTab === "agenda" && <AgendaWorkflow />}
 
       {/* Committees Sub-Tab */}
       {boardTab === "committees" && (
@@ -4990,11 +5038,6 @@ function BoardManagementView() {
             </table>
           </div>
         </div>
-      )}
-
-      {/* Calendar Sub-Tab — Live Meeting Calendar with APCE */}
-      {boardTab === "calendar" && (
-        <MeetingCalendarManager />
       )}
 
       {/* Organogram Sub-Tab */}
