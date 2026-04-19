@@ -23,7 +23,9 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^3.8.1",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "@ums/domain": "workspace:*",
+    "@ums/source-data": "workspace:*"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.7",
