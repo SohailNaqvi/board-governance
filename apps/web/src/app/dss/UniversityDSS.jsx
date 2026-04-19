@@ -16,7 +16,8 @@ import {
   Cpu, Filter, Beaker, PauseCircle, Circle, Info,
   UserCheck, BookMarked, Wifi, WifiOff,
   Plus, Trash2, Edit3, Save, Copy, Download, Upload, Move,
-  ChevronUp, FolderTree, Search, Landmark, Scale, FileCheck, Send
+  ChevronUp, FolderTree, Search, Landmark, Scale, FileCheck, Send,
+  Megaphone, Mail, UserPlus, MessageSquare, BookCheck
 } from "lucide-react";
 
 /* ══════════════════════════════════════════════════════════
@@ -3181,6 +3182,590 @@ const MEETING_STATUS_COLORS = {
 // Agenda Workflow — Wrapper housing all seven-stage sub-components
 // Stages: Calendar → Submissions → Triage → VC Cockpit → Agenda Items
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Slice 7: Circulation Manager — Registrar circulates finalized papers
+// Per Section 2.6: Circulation of Agenda Pack
+// ═══════════════════════════════════════════════════════════════════════════════
+function CirculationManager() {
+  const [meetings, setMeetings] = useState([]);
+  const [selectedMeeting, setSelectedMeeting] = useState("");
+  const [papers, setPapers] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [queries, setQueries] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [meeting, setMeeting] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [activePanel, setActivePanel] = useState("overview"); // overview | members | queries
+  const [addMemberModal, setAddMemberModal] = useState(false);
+  const [newMember, setNewMember] = useState({ name: "", email: "", memberNumber: "", department: "" });
+  const [responseModal, setResponseModal] = useState(null);
+  const [responseText, setResponseText] = useState("");
+
+  const showToast = (msg, success = true) => { setToast({ message: msg, success }); setTimeout(() => setToast(null), 4000); };
+
+  const fetchData = useCallback(async () => {
+    try {
+      const params = selectedMeeting ? `?meetingId=${selectedMeeting}` : "";
+      const res = await fetch(`/api/board/circulation${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMeetings(data.meetings || []);
+        setPapers(data.papers || []);
+        setMembers(data.members || []);
+        setQueries(data.queries || []);
+        setStats(data.stats || null);
+        setMeeting(data.meeting || null);
+      }
+    } catch (e) { console.error("Failed to fetch circulation:", e); }
+    finally { setLoading(false); }
+  }, [selectedMeeting]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleCirculate = async () => {
+    if (!selectedMeeting) return;
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/board/circulation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meetingId: selectedMeeting, action: "circulate" }),
+      });
+      const data = await res.json();
+      if (res.ok) { showToast(`${data.papersCirculated} papers circulated successfully`); fetchData(); }
+      else { showToast(data.error || "Failed to circulate", false); }
+    } catch (e) { showToast("Network error", false); }
+    finally { setProcessing(false); }
+  };
+
+  const handleAddMember = async () => {
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/board/circulation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add_member", ...newMember }),
+      });
+      const data = await res.json();
+      if (res.ok) { showToast("Member added"); setAddMemberModal(false); setNewMember({ name: "", email: "", memberNumber: "", department: "" }); fetchData(); }
+      else { showToast(data.error || "Failed", false); }
+    } catch (e) { showToast("Network error", false); }
+    finally { setProcessing(false); }
+  };
+
+  const handleRespondQuery = async () => {
+    if (!responseModal || !responseText.trim()) return;
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/board/circulation", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "respond_query", queryId: responseModal.id, responseText }),
+      });
+      if (res.ok) { showToast("Response sent"); setResponseModal(null); setResponseText(""); fetchData(); }
+      else { const d = await res.json(); showToast(d.error || "Failed", false); }
+    } catch (e) { showToast("Network error", false); }
+    finally { setProcessing(false); }
+  };
+
+  if (loading) return <div className="p-8 text-center text-gray-500">Loading circulation data...</div>;
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-white ${toast.success ? "bg-green-500" : "bg-red-500"}`}>
+          {toast.message}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <Megaphone className="w-5 h-5 text-red-500" /> Circulation Manager
+          </h3>
+          <p className="text-sm text-gray-500 mt-1">Circulate finalized working papers to Syndicate members</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <select value={selectedMeeting} onChange={e => { setSelectedMeeting(e.target.value); setLoading(true); }} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <option value="">Select Meeting</option>
+            {meetings.map(m => <option key={m.id} value={m.id}>Meeting #{m.meetingNumber} — {m.title || new Date(m.meetingDate).toLocaleDateString()}</option>)}
+          </select>
+          <button onClick={() => setAddMemberModal(true)} className="flex items-center gap-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100">
+            <UserPlus className="w-4 h-4" /> Add Member
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-5 gap-4">
+          <div className="bg-white border rounded-lg p-4">
+            <div className="text-sm text-gray-500">Total Papers</div>
+            <div className="text-2xl font-bold text-gray-900 mt-1">{stats.totalPapers}</div>
+            <div className="text-xs text-gray-400 mt-1">{stats.finalizedPapers} finalized, {stats.circulatedPapers} circulated</div>
+          </div>
+          <div className="bg-white border rounded-lg p-4">
+            <div className="text-sm text-gray-500">Members</div>
+            <div className="text-2xl font-bold text-blue-600 mt-1">{stats.totalMembers}</div>
+          </div>
+          <div className="bg-white border rounded-lg p-4">
+            <div className="text-sm text-gray-500">Read Coverage</div>
+            <div className="text-2xl font-bold mt-1" style={{ color: stats.overallCoverage >= 75 ? "#10b981" : stats.overallCoverage >= 50 ? "#f59e0b" : "#ef4444" }}>{stats.overallCoverage}%</div>
+            <div className="text-xs text-gray-400 mt-1">{stats.totalReadReceipts} receipts</div>
+          </div>
+          <div className="bg-white border rounded-lg p-4">
+            <div className="text-sm text-gray-500">Open Queries</div>
+            <div className="text-2xl font-bold text-amber-600 mt-1">{stats.openQueries}</div>
+            <div className="text-xs text-gray-400 mt-1">{stats.answeredQueries} answered</div>
+          </div>
+          <div className="bg-white border rounded-lg p-4">
+            <div className="text-sm text-gray-500">Status</div>
+            <div className="mt-1">
+              {meeting?.status === "PAPERS_CIRCULATED" ? (
+                <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">Circulated</span>
+              ) : stats.readyToCirculate ? (
+                <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700">Ready to Circulate</span>
+              ) : (
+                <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">Pending Papers</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Circulate Button */}
+      {stats?.readyToCirculate && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <div className="font-medium text-amber-800">Papers Ready for Circulation</div>
+            <div className="text-sm text-amber-600 mt-1">{stats.finalizedPapers} finalized papers will be sent to {stats.totalMembers} members</div>
+          </div>
+          <button onClick={handleCirculate} disabled={processing} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
+            <Megaphone className="w-4 h-4" /> {processing ? "Circulating..." : "Circulate Now"}
+          </button>
+        </div>
+      )}
+
+      {/* Sub-navigation */}
+      {selectedMeeting && (
+        <>
+          <div className="flex gap-2 border-b border-gray-200 pb-2">
+            {[
+              { id: "overview", label: "Paper Coverage", icon: FileText },
+              { id: "members", label: "Member Engagement", icon: Users },
+              { id: "queries", label: "Pre-Meeting Queries", icon: MessageSquare },
+            ].map(p => (
+              <button key={p.id} onClick={() => setActivePanel(p.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition ${activePanel === p.id ? "bg-blue-100 text-blue-800" : "text-gray-500 hover:bg-gray-100"}`}>
+                <p.icon className="w-4 h-4" /> {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Paper Coverage */}
+          {activePanel === "overview" && (
+            <div className="bg-white border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-gray-600 font-medium">#</th>
+                    <th className="px-4 py-3 text-left text-gray-600 font-medium">Item</th>
+                    <th className="px-4 py-3 text-center text-gray-600 font-medium">Status</th>
+                    <th className="px-4 py-3 text-center text-gray-600 font-medium">Read By</th>
+                    <th className="px-4 py-3 text-center text-gray-600 font-medium">Coverage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {papers.map(p => (
+                    <tr key={p.paperId} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-4 py-3 text-gray-500">{p.itemNumber}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900">{p.title}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${p.status === "CIRCULATED" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>{p.status}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-700">{p.readCount}/{p.totalMembers}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 justify-center">
+                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${p.coveragePercent}%`, backgroundColor: p.coveragePercent >= 75 ? "#10b981" : p.coveragePercent >= 50 ? "#f59e0b" : "#ef4444" }} />
+                          </div>
+                          <span className="text-xs text-gray-500">{p.coveragePercent}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {papers.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No papers for this meeting</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Member Engagement */}
+          {activePanel === "members" && (
+            <div className="bg-white border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-gray-600 font-medium">Member</th>
+                    <th className="px-4 py-3 text-left text-gray-600 font-medium">Department</th>
+                    <th className="px-4 py-3 text-center text-gray-600 font-medium">Papers Read</th>
+                    <th className="px-4 py-3 text-center text-gray-600 font-medium">Coverage</th>
+                    <th className="px-4 py-3 text-center text-gray-600 font-medium">Queries</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map(m => (
+                    <tr key={m.memberId} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{m.name}</div>
+                        <div className="text-xs text-gray-400">{m.memberNumber}</div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700">{m.department || "—"}</td>
+                      <td className="px-4 py-3 text-center text-gray-700">{m.papersRead}/{m.totalPapers}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 justify-center">
+                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${m.readPercent}%`, backgroundColor: m.readPercent >= 75 ? "#10b981" : m.readPercent >= 50 ? "#f59e0b" : "#ef4444" }} />
+                          </div>
+                          <span className="text-xs text-gray-500">{m.readPercent}%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">{m.queriesSubmitted > 0 && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">{m.queriesSubmitted}</span>}</td>
+                    </tr>
+                  ))}
+                  {members.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No active members. Add members to track engagement.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Queries Panel */}
+          {activePanel === "queries" && (
+            <div className="space-y-3">
+              {queries.filter(q => q.status === "OPEN").length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium text-gray-700">Open Queries</h4>
+                  {queries.filter(q => q.status === "OPEN").map(q => (
+                    <div key={q.id} className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{q.syndicateMember?.name || "Member"}</div>
+                          <div className="text-xs text-gray-400 mt-0.5">{new Date(q.queryDate).toLocaleString()}</div>
+                          <div className="mt-2 text-sm text-gray-700">{q.queryText}</div>
+                        </div>
+                        <button onClick={() => { setResponseModal(q); setResponseText(""); }} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">Respond</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {queries.filter(q => q.status === "ANSWERED").length > 0 && (
+                <div className="space-y-3 mt-4">
+                  <h4 className="font-medium text-gray-700">Answered Queries</h4>
+                  {queries.filter(q => q.status === "ANSWERED").map(q => (
+                    <div key={q.id} className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="text-sm font-medium text-gray-900">{q.syndicateMember?.name || "Member"}</div>
+                      <div className="text-xs text-gray-400">{new Date(q.queryDate).toLocaleString()}</div>
+                      <div className="mt-2 text-sm text-gray-700">{q.queryText}</div>
+                      <div className="mt-2 pl-3 border-l-2 border-green-400 text-sm text-green-800">{q.responseText}</div>
+                      <div className="text-xs text-gray-400 mt-1">Answered: {q.responseDate ? new Date(q.responseDate).toLocaleString() : ""}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {queries.length === 0 && <div className="text-center text-gray-400 py-8">No queries submitted yet</div>}
+            </div>
+          )}
+        </>
+      )}
+
+      {!selectedMeeting && meetings.length > 0 && (
+        <div className="text-center text-gray-400 py-8">Select a meeting above to view circulation details</div>
+      )}
+      {!selectedMeeting && meetings.length === 0 && (
+        <div className="text-center text-gray-400 py-8">No meetings are ready for circulation. Papers must be finalized first (Stages 1-6).</div>
+      )}
+
+      {/* Add Member Modal */}
+      {addMemberModal && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setAddMemberModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><UserPlus className="w-5 h-5 text-blue-500" /> Add Syndicate Member</h4>
+            <div className="space-y-3">
+              <div><label className="text-xs text-gray-500">Full Name *</label><input value={newMember.name} onChange={e => setNewMember({...newMember, name: e.target.value})} className="w-full border rounded px-3 py-2 text-sm mt-1" /></div>
+              <div><label className="text-xs text-gray-500">Email *</label><input value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} className="w-full border rounded px-3 py-2 text-sm mt-1" type="email" /></div>
+              <div><label className="text-xs text-gray-500">Member Number *</label><input value={newMember.memberNumber} onChange={e => setNewMember({...newMember, memberNumber: e.target.value})} className="w-full border rounded px-3 py-2 text-sm mt-1" placeholder="SYN-001" /></div>
+              <div><label className="text-xs text-gray-500">Department</label><input value={newMember.department} onChange={e => setNewMember({...newMember, department: e.target.value})} className="w-full border rounded px-3 py-2 text-sm mt-1" /></div>
+            </div>
+            <div className="flex gap-2 mt-4 justify-end">
+              <button onClick={() => setAddMemberModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
+              <button onClick={handleAddMember} disabled={!newMember.name || !newMember.email || !newMember.memberNumber || processing} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">{processing ? "Adding..." : "Add Member"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Respond to Query Modal */}
+      {responseModal && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setResponseModal(null)}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <h4 className="font-bold text-gray-900 mb-3">Respond to Query</h4>
+            <div className="bg-gray-50 border rounded p-3 mb-3">
+              <div className="text-sm font-medium text-gray-700">{responseModal.syndicateMember?.name}</div>
+              <div className="text-sm text-gray-600 mt-1">{responseModal.queryText}</div>
+            </div>
+            <textarea value={responseText} onChange={e => setResponseText(e.target.value)} rows={4} className="w-full border rounded px-3 py-2 text-sm" placeholder="Type your response..." />
+            <div className="flex gap-2 mt-3 justify-end">
+              <button onClick={() => setResponseModal(null)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
+              <button onClick={handleRespondQuery} disabled={!responseText.trim() || processing} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">{processing ? "Sending..." : "Send Response"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Slice 7: Member Portal View — Syndicate members read papers, submit queries
+// Per Section 2.6: Member Engagement Portal
+// ═══════════════════════════════════════════════════════════════════════════════
+function MemberPortalView() {
+  const [members, setMembers] = useState([]);
+  const [meetings, setMeetings] = useState([]);
+  const [selectedMember, setSelectedMember] = useState("");
+  const [selectedMeeting, setSelectedMeeting] = useState("");
+  const [papers, setPapers] = useState([]);
+  const [queries, setQueries] = useState([]);
+  const [memberInfo, setMemberInfo] = useState(null);
+  const [meetingInfo, setMeetingInfo] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [expandedPaper, setExpandedPaper] = useState(null);
+  const [processing, setProcessing] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [queryText, setQueryText] = useState("");
+
+  const showToast = (msg, success = true) => { setToast({ message: msg, success }); setTimeout(() => setToast(null), 4000); };
+
+  const fetchPortal = useCallback(async () => {
+    try {
+      let url = "/api/board/member-portal";
+      const params = [];
+      if (selectedMember) params.push(`memberId=${selectedMember}`);
+      if (selectedMeeting) params.push(`meetingId=${selectedMeeting}`);
+      if (params.length) url += "?" + params.join("&");
+
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (!selectedMember) {
+          setMembers(data.members || []);
+          setMeetings(data.meetings || []);
+        } else {
+          setMemberInfo(data.member || null);
+          setMeetingInfo(data.meeting || null);
+          setPapers(data.papers || []);
+          setQueries(data.queries || []);
+          setStats(data.stats || null);
+          if (data.meetings) setMeetings(data.meetings);
+        }
+      }
+    } catch (e) { console.error("Portal fetch error:", e); }
+    finally { setLoading(false); }
+  }, [selectedMember, selectedMeeting]);
+
+  useEffect(() => { setLoading(true); fetchPortal(); }, [fetchPortal]);
+
+  const handleMarkRead = async (paperId) => {
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/board/member-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_read", memberId: selectedMember, paperId }),
+      });
+      const data = await res.json();
+      if (res.ok || res.status === 409) { showToast("Marked as read"); fetchPortal(); }
+      else { showToast(data.error || "Failed", false); }
+    } catch (e) { showToast("Network error", false); }
+    finally { setProcessing(false); }
+  };
+
+  const handleSubmitQuery = async () => {
+    if (!queryText.trim() || queryText.trim().length < 10) { showToast("Query must be at least 10 characters", false); return; }
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/board/member-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "submit_query", memberId: selectedMember, queryText }),
+      });
+      const data = await res.json();
+      if (res.ok) { showToast("Query submitted"); setQueryText(""); fetchPortal(); }
+      else { showToast(data.error || "Failed", false); }
+    } catch (e) { showToast("Network error", false); }
+    finally { setProcessing(false); }
+  };
+
+  if (loading) return <div className="p-8 text-center text-gray-500">Loading member portal...</div>;
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-white ${toast.success ? "bg-green-500" : "bg-red-500"}`}>
+          {toast.message}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <BookCheck className="w-5 h-5 text-green-600" /> Member Portal
+          </h3>
+          <p className="text-sm text-gray-500 mt-1">Review circulated papers, acknowledge reading, submit pre-meeting queries</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <select value={selectedMember} onChange={e => { setSelectedMember(e.target.value); setSelectedMeeting(""); }} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <option value="">Select Member</option>
+            {members.map(m => <option key={m.id} value={m.id}>{m.name} ({m.memberNumber})</option>)}
+          </select>
+          {selectedMember && meetings.length > 0 && (
+            <select value={selectedMeeting} onChange={e => setSelectedMeeting(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <option value="">Select Meeting</option>
+              {meetings.map(m => <option key={m.id} value={m.id}>Meeting #{m.meetingNumber} — {new Date(m.meetingDate).toLocaleDateString()}</option>)}
+            </select>
+          )}
+        </div>
+      </div>
+
+      {!selectedMember && (
+        <div className="text-center text-gray-400 py-12">Select a Syndicate member above to access their portal</div>
+      )}
+
+      {selectedMember && !selectedMeeting && (
+        <div className="text-center text-gray-400 py-12">
+          {meetings.length > 0 ? "Select a meeting to view circulated papers" : "No meetings with circulated papers available"}
+        </div>
+      )}
+
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-4 gap-4">
+          <div className="bg-white border rounded-lg p-4">
+            <div className="text-sm text-gray-500">Papers to Read</div>
+            <div className="text-2xl font-bold text-gray-900 mt-1">{stats.totalPapers}</div>
+          </div>
+          <div className="bg-white border rounded-lg p-4">
+            <div className="text-sm text-gray-500">Read</div>
+            <div className="text-2xl font-bold text-green-600 mt-1">{stats.papersRead}</div>
+            <div className="w-full h-2 bg-gray-200 rounded-full mt-2"><div className="h-full bg-green-500 rounded-full" style={{width:`${stats.readPercent}%`}} /></div>
+          </div>
+          <div className="bg-white border rounded-lg p-4">
+            <div className="text-sm text-gray-500">My Queries</div>
+            <div className="text-2xl font-bold text-blue-600 mt-1">{stats.queriesOpen + stats.queriesAnswered}</div>
+            <div className="text-xs text-gray-400 mt-1">{stats.queriesOpen} open, {stats.queriesAnswered} answered</div>
+          </div>
+          <div className="bg-white border rounded-lg p-4">
+            <div className="text-sm text-gray-500">Query Window</div>
+            <div className="mt-1">{stats.queriesAccepted ? <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">Open</span> : <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700">Closed</span>}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Papers List */}
+      {papers.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="font-medium text-gray-700">Agenda Papers</h4>
+          {papers.map(p => (
+            <div key={p.id} className={`border rounded-lg overflow-hidden ${p.hasRead ? "bg-green-50 border-green-200" : "bg-white border-gray-200"}`}>
+              <div className="p-4 flex items-center justify-between cursor-pointer" onClick={() => setExpandedPaper(expandedPaper === p.id ? null : p.id)}>
+                <div className="flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" style={{backgroundColor: p.hasRead ? "#dcfce7" : "#f3f4f6", color: p.hasRead ? "#16a34a" : "#6b7280"}}>{p.itemNumber}</span>
+                  <div>
+                    <div className="font-medium text-gray-900">{p.title}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{p.category} • by {p.proposedBy} {p.annexureCount > 0 ? `• ${p.annexureCount} annexures` : ""}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {p.hasRead ? (
+                    <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs"><CheckCircle className="w-3 h-3" /> Read {p.readAt ? new Date(p.readAt).toLocaleDateString() : ""}</span>
+                  ) : (
+                    <button onClick={e => { e.stopPropagation(); handleMarkRead(p.id); }} disabled={processing} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50">Mark as Read</button>
+                  )}
+                  {expandedPaper === p.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                </div>
+              </div>
+              {expandedPaper === p.id && (
+                <div className="border-t px-4 py-4 space-y-3 bg-white">
+                  {p.sections.itemReference && <div><div className="text-xs font-medium text-gray-500 mb-1">Item Reference</div><div className="text-sm text-gray-700 whitespace-pre-wrap">{p.sections.itemReference}</div></div>}
+                  {p.sections.background && <div><div className="text-xs font-medium text-gray-500 mb-1">Background & Context</div><div className="text-sm text-gray-700 whitespace-pre-wrap">{p.sections.background}</div></div>}
+                  {p.sections.issueForConsideration && <div><div className="text-xs font-medium text-gray-500 mb-1">Issue for Consideration</div><div className="text-sm text-gray-700 whitespace-pre-wrap">{p.sections.issueForConsideration}</div></div>}
+                  {p.sections.financialImplications && <div><div className="text-xs font-medium text-amber-600 mb-1">Financial Implications</div><div className="text-sm text-gray-700 whitespace-pre-wrap">{p.sections.financialImplications}</div></div>}
+                  {p.sections.legalImplications && <div><div className="text-xs font-medium text-red-600 mb-1">Legal & Regulatory Implications</div><div className="text-sm text-gray-700 whitespace-pre-wrap">{p.sections.legalImplications}</div></div>}
+                  {p.sections.priorDecisions && <div><div className="text-xs font-medium text-gray-500 mb-1">Prior Related Decisions</div><div className="text-sm text-gray-700 whitespace-pre-wrap">{p.sections.priorDecisions}</div></div>}
+                  {p.sections.analysis && <div><div className="text-xs font-medium text-gray-500 mb-1">Analysis & Discussion</div><div className="text-sm text-gray-700 whitespace-pre-wrap">{p.sections.analysis}</div></div>}
+                  {p.sections.proposedResolution && <div><div className="text-xs font-medium text-blue-600 mb-1">Proposed Resolution</div><div className="text-sm text-gray-700 whitespace-pre-wrap">{p.sections.proposedResolution}</div></div>}
+                  {p.sections.recommendations && <div><div className="text-xs font-medium text-green-600 mb-1">Recommendations</div><div className="text-sm text-gray-700 whitespace-pre-wrap">{p.sections.recommendations}</div></div>}
+                  {!p.hasRead && (
+                    <div className="pt-2 border-t">
+                      <button onClick={() => handleMarkRead(p.id)} disabled={processing} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Acknowledge Reading</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Query Submission */}
+      {selectedMember && selectedMeeting && stats?.queriesAccepted && (
+        <div className="border rounded-lg p-4">
+          <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Submit Pre-Meeting Query</h4>
+          <textarea value={queryText} onChange={e => setQueryText(e.target.value)} rows={3} className="w-full border rounded px-3 py-2 text-sm" placeholder="Type your query about any agenda item (min 10 characters)..." />
+          <div className="flex justify-end mt-2">
+            <button onClick={handleSubmitQuery} disabled={!queryText.trim() || queryText.trim().length < 10 || processing} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">{processing ? "Submitting..." : "Submit Query"}</button>
+          </div>
+        </div>
+      )}
+
+      {/* My Queries */}
+      {queries.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="font-medium text-gray-700">My Queries</h4>
+          {queries.map(q => (
+            <div key={q.id} className={`border rounded-lg p-4 ${q.status === "ANSWERED" ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}`}>
+              <div className="flex items-center gap-2 text-xs mb-1">
+                <span className={`px-2 py-0.5 rounded font-medium ${q.status === "ANSWERED" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{q.status}</span>
+                <span className="text-gray-400">{new Date(q.queryDate).toLocaleString()}</span>
+              </div>
+              <div className="text-sm text-gray-700">{q.queryText}</div>
+              {q.responseText && (
+                <div className="mt-2 pl-3 border-l-2 border-green-400 text-sm text-green-800">
+                  <div className="text-xs text-gray-400 mb-0.5">Response ({q.responseDate ? new Date(q.responseDate).toLocaleString() : ""}):</div>
+                  {q.responseText}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AgendaWorkflow() {
   const [stage, setStage] = useState("calendar");
 
@@ -3191,6 +3776,7 @@ function AgendaWorkflow() {
     { id: "cockpit", label: "4. VC Cockpit", icon: Monitor, color: "#6366f1" },
     { id: "builder", label: "5. Agenda Items", icon: FileText, color: "#10b981" },
     { id: "papers", label: "6. Working Papers", icon: BookOpen, color: "#0891b2" },
+    { id: "circulation", label: "7. Circulation", icon: Megaphone, color: "#dc2626" },
   ];
 
   return (
@@ -3233,10 +3819,12 @@ function AgendaWorkflow() {
         {stage === "cockpit" && <VCStrategicCockpit />}
         {stage === "builder" && <AgendaBuilderInteractive />}
         {stage === "papers" && <WorkingPaperWorkspace />}
+        {stage === "circulation" && <CirculationManager />}
       </div>
     </div>
   );
 }
+
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -4828,6 +5416,7 @@ function BoardManagementView() {
     { id: "guardrails", label: "Guardrails", icon: AlertTriangle },
     { id: "orgchart", label: "Organogram", icon: FolderTree },
     { id: "governance", label: "Governance Config", icon: Settings },
+    { id: "memberportal", label: "Member Portal", icon: BookCheck },
   ];
 
   const filteredActions = actionFilter === "all" ? BOARD_ACTION_ITEMS : BOARD_ACTION_ITEMS.filter(a => a.status === actionFilter);
@@ -5021,6 +5610,9 @@ function BoardManagementView() {
 
       {/* Agenda Builder — Contains full seven-stage workflow */}
       {boardTab === "agenda" && <AgendaWorkflow />}
+
+      {/* Member Portal — Syndicate members read papers, submit queries */}
+      {boardTab === "memberportal" && <MemberPortalView />}
 
       {/* Committees Sub-Tab */}
       {boardTab === "committees" && (

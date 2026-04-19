@@ -1,6 +1,6 @@
 # Board Governance Module — User Journeys
 
-> Updated through Slice 5. This document tracks end-to-end user journeys across all implemented slices.
+> Updated through Slice 7. This document tracks end-to-end user journeys across all implemented slices.
 
 ---
 
@@ -101,7 +101,7 @@
 
 ---
 
-## Journey 5: End-to-End Happy Path (Slices 2–5)
+## Journey 5: End-to-End Happy Path (Slices 2–7)
 
 **Combined workflow demonstrating all slices working together:**
 
@@ -116,23 +116,10 @@
    - Reviews precedent: similar budget reallocation approved 8 months ago.
    - **Approves both items** via "Approve Full Agenda".
    - Meeting status → AGENDA_APPROVED.
-6. **Registrar notified** — Working paper preparation may begin (Slice 6, future).
-
----
-
-## Journey Map by Slice
-
-| Slice | Stage | Actor | Key Actions |
-|-------|-------|-------|-------------|
-| 2 | Stage 1: Call Notice | Registrar | Create meeting, APCE auto-generates deadlines |
-| 3 | Stage 2: Submission | Proposer | Submit item with prerequisite validation |
-| 4 | Stage 3: Vetting | Registrar | Triage with DSS scoring, vet/return/route |
-| 5 | Stage 4: VC Approval | Vice Chancellor | Review, reorder, approve/defer/return, bulk approve |
-| 6 | Stage 5: Working Papers | Registrar | *(Future)* Author working papers with auto-population |
-| 7 | Stage 6: Circulation | Member | *(Future)* Read papers, submit queries, RSVP |
-| 8 | Stage 7: Post-Meeting | Registrar/VC | *(Future)* Minutes, decisions, ATR tracking |
-| 9 | Intelligence | System | *(Future)* ML classifiers, advanced scoring |
-| 10 | Compliance | Registrar | *(Future)* Regulatory export, audit trail |
+6. **Registrar creates working papers** — Instantiates papers for both items. System auto-populates 7 sections each. Registrar completes analysis and recommendations. Both papers finalized.
+7. **Registrar circulates** — Opens Circulation Manager (Stage 7). Clicks "Circulate Now". Both papers transition FINALIZED → CIRCULATED. Meeting status → PAPERS_CIRCULATED. All Syndicate members notified.
+8. **Syndicate members review** — Each member opens Member Portal. Reads each paper (expanding to see all sections). Marks each as read (read receipt recorded). Dr. Ahmed submits a query about the budget allocation methodology.
+9. **Registrar responds** — Opens Queries panel in Circulation Manager. Responds to Dr. Ahmed's query with detailed explanation.
 
 ---
 
@@ -162,9 +149,48 @@
 9. **Review Workflow:**
    - **Finalize** — Reviewer signs off. Status → FINALIZED. Notification to VC.
    - **Return** — Reviewer sends back with mandatory comments. Status → IN_AUTHORING.
-10. **Paper Ready** — FINALIZED papers are ready for circulation (Stage 7, future).
+10. **Paper Ready** — FINALIZED papers are ready for circulation (Stage 7).
 
 **Exit Conditions:** WorkingPaper in FINALIZED state with all sections complete.
+
+---
+
+## Journey 7: Circulation & Member Portal (Slice 7)
+
+**Actor (Registrar side):** Registrar
+**Actor (Member side):** Syndicate Member
+
+### 7A: Registrar Circulates Papers
+
+1. **Open Circulation Manager** — Navigate to Board Governance → Agenda Builder → Stage 7: Circulation.
+2. **Select Meeting** — Pick a meeting with FINALIZED papers from dropdown.
+3. **Review Readiness** — Stats show: total papers, finalized count, member count. Amber banner confirms "Papers Ready for Circulation".
+4. **Add Members (if needed)** — Click "Add Member" to register new Syndicate members (name, email, member number, department).
+5. **Circulate** — Click "Circulate Now":
+   - All FINALIZED papers → CIRCULATED status.
+   - All corresponding agenda items → CIRCULATED status.
+   - Meeting status → PAPERS_CIRCULATED.
+   - APCE Circulation event marked COMPLETED.
+   - Notifications sent to all SYNDICATE_MEMBER and VICE_CHANCELLOR roles.
+6. **Monitor Coverage** — Paper Coverage tab shows per-paper read counts and coverage percentages with color-coded progress bars.
+7. **Track Member Engagement** — Member Engagement tab shows per-member read counts and query submissions.
+8. **Respond to Queries** — Pre-Meeting Queries tab shows open queries from members. Registrar clicks "Respond", types answer, and sends. Query status → ANSWERED.
+
+**Exit Conditions:** WorkingPapers in CIRCULATED, meeting status PAPERS_CIRCULATED.
+
+### 7B: Member Reviews Papers
+
+1. **Open Member Portal** — Navigate to Board Governance → Member Portal tab.
+2. **Select Identity** — Choose member from dropdown (simulates login).
+3. **Select Meeting** — Pick the meeting with circulated papers.
+4. **View Stats** — Dashboard shows: papers to read, papers read (with progress bar), queries submitted, query window status.
+5. **Read Paper** — Click on a paper to expand and see all working paper sections:
+   - Item Reference, Background, Issue for Consideration, Financial Implications, Legal Implications, Prior Decisions, Analysis, Proposed Resolution, Recommendations.
+6. **Acknowledge Reading** — Click "Mark as Read" (or "Acknowledge Reading" inside expanded view). Read receipt created with timestamp.
+7. **Submit Query** — Type a pre-meeting query (minimum 10 characters) in the query form. System notifies Registrar.
+8. **View Responses** — Previously submitted queries shown with status badges (OPEN/ANSWERED) and inline responses.
+
+**Exit Conditions:** ReadReceipts created. MemberQueries submitted. Full read coverage tracked.
 
 ---
 
@@ -177,7 +203,7 @@
 | 4 | Stage 3: Vetting | Registrar | Triage with DSS scoring, vet/return/route |
 | 5 | Stage 4: VC Approval | Vice Chancellor | Review, reorder, approve/defer/return, bulk approve |
 | 6 | Stage 5: Working Papers | Registrar | Instantiate, auto-populate, author, review, finalize |
-| 7 | Stage 6: Circulation | Member | *(Future)* Read papers, submit queries, RSVP |
+| 7 | Stage 6: Circulation | Registrar + Member | Circulate papers, read receipts, queries, responses |
 | 8 | Stage 7: Post-Meeting | Registrar/VC | *(Future)* Minutes, decisions, ATR tracking |
 | 9 | Intelligence | System | *(Future)* ML classifiers, advanced scoring |
 | 10 | Compliance | Registrar | *(Future)* Regulatory export, audit trail |
