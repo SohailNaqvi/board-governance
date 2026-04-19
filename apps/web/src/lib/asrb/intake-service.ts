@@ -7,7 +7,7 @@ import {
   MockStudentReader,
   MockSupervisorReader,
   MockASRBResolutionReader,
-} from "@board-governance/source-data";
+} from "@ums/source-data";
 import type { CaseIntakeEnvelope } from "./schemas";
 
 const UPLOAD_TOKEN_EXPIRY_MINUTES = 60;

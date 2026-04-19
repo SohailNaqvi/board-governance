@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import prisma from "../prisma";
-import { CaseType } from "@board-governance/domain/enums";
+import { CaseType } from "@ums/domain";
 
 export interface FeederClientContext {
   id: string;
