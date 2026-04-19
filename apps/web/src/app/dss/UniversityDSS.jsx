@@ -4453,19 +4453,19 @@ function BoardManagementView() {
 
   const boardSubTabs = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "actions", label: "Action Tracker", icon: ClipboardCheck },
+    { id: "calendar", label: "Calendar", icon: Calendar },
     { id: "submissions", label: "Submissions", icon: Send },
     { id: "triage", label: "Triage Queue", icon: Filter },
     { id: "cockpit", label: "VC Cockpit", icon: Monitor },
     { id: "agenda", label: "Agenda Builder", icon: FileText },
+    { id: "actions", label: "Action Tracker", icon: ClipboardCheck },
+    { id: "decisions", label: "Decision Register", icon: Briefcase },
     { id: "committees", label: "Committees", icon: Users },
     { id: "kpis", label: "Board KPIs", icon: TrendingUp },
     { id: "vceval", label: "VC Evaluation", icon: Award },
     { id: "selfassess", label: "Self-Assessment", icon: Shield },
     { id: "guardrails", label: "Guardrails", icon: AlertTriangle },
-    { id: "calendar", label: "Calendar", icon: Calendar },
     { id: "orgchart", label: "Organogram", icon: FolderTree },
-    { id: "decisions", label: "Decision Register", icon: Briefcase },
     { id: "governance", label: "Governance Config", icon: Settings },
   ];
 
