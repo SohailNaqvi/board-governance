@@ -3177,6 +3177,487 @@ const MEETING_STATUS_COLORS = {
   MINUTES_DRAFTED: "#f97316", MINUTES_CONFIRMED: "#059669",
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Slice 4: Registrar Triage Queue with DSS Intelligence Scoring
+// Per Section 2.3: Vetting and Consolidation
+// ═══════════════════════════════════════════════════════════════════════════════
+function RegistrarTriageQueue() {
+  const [items, setItems] = useState([]);
+  const [meetings, setMeetings] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [dossier, setDossier] = useState(null);
+  const [loadingDossier, setLoadingDossier] = useState(false);
+  const [filterMeeting, setFilterMeeting] = useState("");
+  const [showVetted, setShowVetted] = useState(false);
+  const [actionModal, setActionModal] = useState(null); // { type: "vet"|"return"|"route", item }
+  const [actionNotes, setActionNotes] = useState("");
+  const [returnReason, setReturnReason] = useState("");
+  const [routeTo, setRouteTo] = useState("legal");
+  const [processing, setProcessing] = useState(false);
+  const [actionResult, setActionResult] = useState(null);
+
+  const fetchQueue = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (filterMeeting) params.set("meetingId", filterMeeting);
+      if (showVetted) params.set("includeVetted", "true");
+      const res = await fetch(`/api/board/triage?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.items || []);
+        setMeetings(data.meetings || []);
+        setStats(data.stats || null);
+      }
+    } catch (e) {
+      console.error("Failed to fetch triage queue:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterMeeting, showVetted]);
+
+  useEffect(() => { fetchQueue(); }, [fetchQueue]);
+
+  const fetchItemDossier = async (item) => {
+    setSelectedItem(item);
+    setLoadingDossier(true);
+    try {
+      const res = await fetch(`/api/board/triage?itemId=${item.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDossier(data.dossier);
+      }
+    } catch (e) {
+      console.error("Failed to fetch dossier:", e);
+    } finally {
+      setLoadingDossier(false);
+    }
+  };
+
+  const handleAction = async () => {
+    if (!actionModal) return;
+    setProcessing(true);
+    try {
+      const payload = { id: actionModal.item.id, action: actionModal.type, notes: actionNotes };
+      if (actionModal.type === "return") payload.returnReason = returnReason;
+      if (actionModal.type === "route") payload.routeTo = routeTo;
+
+      const res = await fetch("/api/board/triage", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActionResult({ success: true, message: `Item ${data.action} successfully.` });
+        setActionModal(null);
+        setActionNotes("");
+        setReturnReason("");
+        fetchQueue();
+        if (selectedItem?.id === actionModal.item.id) {
+          setSelectedItem(null);
+          setDossier(null);
+        }
+      } else {
+        setActionResult({ success: false, message: data.error || "Action failed" });
+      }
+    } catch (e) {
+      setActionResult({ success: false, message: "Network error" });
+    } finally {
+      setProcessing(false);
+      setTimeout(() => setActionResult(null), 4000);
+    }
+  };
+
+  const getSeverityColor = (severity) => {
+    if (severity === "high") return "#ef4444";
+    if (severity === "medium") return "#f59e0b";
+    return "#6b7280";
+  };
+
+  const getCompletenessColor = (pct) => {
+    if (pct >= 80) return "#10b981";
+    if (pct >= 60) return "#f59e0b";
+    return "#ef4444";
+  };
+
+  const getRiskBadge = (level) => {
+    const colors = { high: "bg-red-100 text-red-700", medium: "bg-yellow-100 text-yellow-700", low: "bg-green-100 text-green-700" };
+    return colors[level] || colors.low;
+  };
+
+  if (loading) return <div className="p-8 text-center text-gray-500">Loading triage queue...</div>;
+
+  return (
+    <div className="p-4 space-y-4">
+      {/* Header & Stats */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <Filter className="w-5 h-5 text-blue-600" /> Registrar Triage Queue
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">Review submissions with DSS intelligence scoring</p>
+        </div>
+      </div>
+
+      {/* Stats Bar */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          {[
+            { label: "In Queue", value: stats.totalInQueue, color: "#3b82f6", icon: ClipboardCheck },
+            { label: "Submitted", value: stats.submitted, color: "#8b5cf6", icon: Send },
+            { label: "Vetted", value: stats.vetted, color: "#10b981", icon: CheckCircle },
+            { label: "Returned", value: stats.returned, color: "#f59e0b", icon: ArrowDown },
+            { label: "Financial", value: stats.flaggedFinancial, color: "#ef4444", icon: DollarSign },
+            { label: "Legal", value: stats.flaggedLegal, color: "#dc2626", icon: Scale },
+            { label: "Duplicates", value: stats.duplicateAlerts, color: "#f97316", icon: Copy },
+            { label: "Avg Complete", value: `${stats.avgCompleteness}%`, color: stats.avgCompleteness >= 70 ? "#10b981" : "#f59e0b", icon: Target },
+          ].map((s, i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-lg p-3 text-center">
+              <s.icon className="w-4 h-4 mx-auto mb-1" style={{ color: s.color }} />
+              <div className="text-lg font-bold" style={{ color: s.color }}>{s.value}</div>
+              <div className="text-xs text-gray-500">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-3">
+        <select
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          value={filterMeeting}
+          onChange={e => { setFilterMeeting(e.target.value); setLoading(true); }}
+        >
+          <option value="">All Meetings</option>
+          {meetings.map(m => (
+            <option key={m.id} value={m.id}>Meeting #{m.meetingNumber} — {m.title || new Date(m.meetingDate).toLocaleDateString()}</option>
+          ))}
+        </select>
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+          <input type="checkbox" checked={showVetted} onChange={e => { setShowVetted(e.target.checked); setLoading(true); }} className="rounded" />
+          Include vetted items
+        </label>
+      </div>
+
+      {/* Action Result Toast */}
+      {actionResult && (
+        <div className={`p-3 rounded-lg text-sm font-medium ${actionResult.success ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          {actionResult.message}
+        </div>
+      )}
+
+      {/* Main Content: Queue + Dossier Panel */}
+      <div className="flex gap-4">
+        {/* Queue List */}
+        <div className={`${selectedItem ? "w-1/2" : "w-full"} space-y-3 transition-all`}>
+          {items.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <ClipboardCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg font-medium">No items in triage queue</p>
+              <p className="text-sm">Submitted items will appear here for review</p>
+            </div>
+          ) : items.map(item => {
+            const d = item.dossier;
+            let descData = {};
+            try { descData = JSON.parse(item.description || "{}"); } catch {}
+
+            return (
+              <div
+                key={item.id}
+                onClick={() => fetchItemDossier(item)}
+                className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${selectedItem?.id === item.id ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white"}`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-gray-800 truncate">{item.title}</h3>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        item.status === "SUBMITTED" ? "bg-blue-100 text-blue-700" :
+                        item.status === "VETTED" ? "bg-green-100 text-green-700" :
+                        "bg-yellow-100 text-yellow-700"
+                      }`}>{item.status}</span>
+                      {d?.riskLevel && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRiskBadge(d.riskLevel)}`}>
+                          {d.riskLevel.toUpperCase()} RISK
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                      <span>#{item.itemNumber} • {item.proposedBy}</span>
+                      {item.meetingCalendar && (
+                        <span>Meeting #{item.meetingCalendar.meetingNumber}</span>
+                      )}
+                      {descData.category && (
+                        <span className="px-1.5 py-0.5 bg-gray-100 rounded">{descData.category}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick flags */}
+                  <div className="flex items-center gap-1 ml-2 shrink-0">
+                    {d?.financialFlag && <DollarSign className="w-4 h-4 text-red-500" title="Financial implications" />}
+                    {d?.legalFlag && <Scale className="w-4 h-4 text-red-600" title="Legal flag" />}
+                    {d?.duplicateAlert && <Copy className="w-4 h-4 text-orange-500" title="Potential duplicate" />}
+                  </div>
+                </div>
+
+                {/* Completeness bar */}
+                {d?.completeness && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-500">Completeness</span>
+                      <span style={{ color: getCompletenessColor(d.completeness.percentage) }} className="font-medium">{d.completeness.percentage}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full transition-all" style={{ width: `${d.completeness.percentage}%`, backgroundColor: getCompletenessColor(d.completeness.percentage) }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* DSS Summary */}
+                {d?.summary && d.summary !== "No issues detected." && (
+                  <div className="mt-2 text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
+                    <AlertTriangle className="w-3 h-3 inline mr-1" />{d.summary}
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                {item.status === "SUBMITTED" && (
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={e => { e.stopPropagation(); setActionModal({ type: "vet", item }); }}
+                      className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700"
+                    >
+                      <CheckCircle className="w-3 h-3 inline mr-1" />Vet
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); setActionModal({ type: "return", item }); }}
+                      className="px-3 py-1.5 bg-yellow-500 text-white text-xs font-medium rounded-lg hover:bg-yellow-600"
+                    >
+                      <ArrowDown className="w-3 h-3 inline mr-1" />Return
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); setActionModal({ type: "route", item }); }}
+                      className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700"
+                    >
+                      <ArrowRight className="w-3 h-3 inline mr-1" />Route
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* DSS Dossier Panel */}
+        {selectedItem && (
+          <div className="w-1/2 border border-gray-200 rounded-lg bg-white overflow-y-auto max-h-[75vh]">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                <Lightbulb className="w-5 h-5 text-amber-500" />
+                DSS Intelligence Dossier
+              </h3>
+              <button onClick={() => { setSelectedItem(null); setDossier(null); }} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {loadingDossier ? (
+              <div className="p-8 text-center text-gray-500">Analyzing submission...</div>
+            ) : dossier ? (
+              <div className="p-4 space-y-4">
+                {/* Item Summary */}
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <h4 className="font-semibold text-gray-800">{selectedItem.title}</h4>
+                  <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                    <span>By {selectedItem.proposedBy}</span>
+                    <span>•</span>
+                    <span>Item #{selectedItem.itemNumber}</span>
+                  </div>
+                </div>
+
+                {/* Completeness Score */}
+                <div className="border border-gray-200 rounded-lg p-3">
+                  <h4 className="font-semibold text-gray-700 text-sm mb-2 flex items-center gap-2">
+                    <Target className="w-4 h-4 text-blue-500" /> Completeness Score
+                  </h4>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="text-3xl font-bold" style={{ color: getCompletenessColor(dossier.completeness.percentage) }}>
+                      {dossier.completeness.percentage}%
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {dossier.completeness.score}/{dossier.completeness.maxScore} points
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                    <div className="h-2 rounded-full" style={{ width: `${dossier.completeness.percentage}%`, backgroundColor: getCompletenessColor(dossier.completeness.percentage) }} />
+                  </div>
+                  <div className="space-y-1">
+                    {dossier.completeness.details.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs">
+                        <span className={d.present ? "text-green-600" : "text-red-500"}>
+                          {d.present ? <CheckCircle className="w-3 h-3 inline mr-1" /> : <AlertTriangle className="w-3 h-3 inline mr-1" />}
+                          {d.label}
+                        </span>
+                        <span className="text-gray-400">{d.weight}pts</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Implications */}
+                {dossier.implications.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <h4 className="font-semibold text-gray-700 text-sm mb-2 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-500" /> Implications Detected
+                    </h4>
+                    <div className="space-y-2">
+                      {dossier.implications.map((imp, i) => (
+                        <div key={i} className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: `${getSeverityColor(imp.severity)}10` }}>
+                          <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: getSeverityColor(imp.severity) }} />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-800">{imp.label}</span>
+                              <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ color: getSeverityColor(imp.severity), backgroundColor: `${getSeverityColor(imp.severity)}20` }}>
+                                {imp.severity.toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              Matched terms: {imp.matchedTerms.join(", ")}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Duplicates */}
+                {dossier.duplicates.length > 0 && (
+                  <div className="border border-red-200 rounded-lg p-3 bg-red-50">
+                    <h4 className="font-semibold text-red-700 text-sm mb-2 flex items-center gap-2">
+                      <Copy className="w-4 h-4" /> Potential Duplicates ({dossier.duplicates.length})
+                    </h4>
+                    {dossier.duplicates.map((dup, i) => (
+                      <div key={i} className="bg-white rounded p-2 mb-1 text-sm border border-red-100">
+                        <div className="font-medium text-gray-800">{dup.title}</div>
+                        <div className="text-xs text-gray-500 flex gap-2">
+                          <span>{dup.similarity}% similar</span>
+                          <span>•</span>
+                          <span>{dup.status}</span>
+                          {dup.meeting && <span>• Meeting #{dup.meeting.meetingNumber}</span>}
+                        </div>
+                        {dup.outcome && <div className="text-xs text-green-600 mt-1">Outcome: {dup.outcome.substring(0, 100)}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Precedents */}
+                {dossier.precedents.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <h4 className="font-semibold text-gray-700 text-sm mb-2 flex items-center gap-2">
+                      <BookMarked className="w-4 h-4 text-purple-500" /> Related Precedents ({dossier.precedents.length})
+                    </h4>
+                    {dossier.precedents.slice(0, 5).map((prec, i) => (
+                      <div key={i} className="p-2 mb-1 bg-gray-50 rounded text-sm">
+                        <div className="font-medium text-gray-700">{prec.title}</div>
+                        <div className="text-xs text-gray-500 flex gap-2">
+                          <span>{prec.similarity}% related</span>
+                          <span>•</span>
+                          <span>{prec.status}</span>
+                          {prec.meeting && <span>• Meeting #{prec.meeting.meetingNumber}</span>}
+                        </div>
+                        {prec.outcome && <div className="text-xs text-blue-600 mt-1">Decision: {prec.outcome.substring(0, 100)}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Risk Summary */}
+                <div className={`rounded-lg p-3 ${getRiskBadge(dossier.riskLevel)} border`}>
+                  <h4 className="font-semibold text-sm mb-1">Overall Risk Assessment: {dossier.riskLevel.toUpperCase()}</h4>
+                  <p className="text-xs">{dossier.summary}</p>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
+
+      {/* Action Modal */}
+      {actionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setActionModal(null)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">
+              {actionModal.type === "vet" && "Vet Item for Agenda"}
+              {actionModal.type === "return" && "Return to Proposer"}
+              {actionModal.type === "route" && "Route for Opinion"}
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">"{actionModal.item.title}"</p>
+
+            {actionModal.type === "return" && (
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Return Reason (required)</label>
+                <textarea
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  rows={3}
+                  placeholder="Explain why this item is being returned..."
+                  value={returnReason}
+                  onChange={e => setReturnReason(e.target.value)}
+                />
+              </div>
+            )}
+
+            {actionModal.type === "route" && (
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Route To</label>
+                <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={routeTo} onChange={e => setRouteTo(e.target.value)}>
+                  <option value="legal">Legal Advisor</option>
+                  <option value="treasurer">Treasurer</option>
+                </select>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+              <textarea
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                rows={2}
+                placeholder="Additional notes..."
+                value={actionNotes}
+                onChange={e => setActionNotes(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button onClick={() => { setActionModal(null); setActionNotes(""); setReturnReason(""); }} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">
+                Cancel
+              </button>
+              <button
+                onClick={handleAction}
+                disabled={processing || (actionModal.type === "return" && !returnReason)}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 ${
+                  actionModal.type === "vet" ? "bg-green-600 hover:bg-green-700" :
+                  actionModal.type === "return" ? "bg-yellow-500 hover:bg-yellow-600" :
+                  "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {processing ? "Processing..." :
+                  actionModal.type === "vet" ? "Confirm Vet" :
+                  actionModal.type === "return" ? "Return Item" :
+                  "Route Item"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MeetingCalendarManager() {
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -3647,6 +4128,7 @@ function BoardManagementView() {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "actions", label: "Action Tracker", icon: ClipboardCheck },
     { id: "submissions", label: "Submissions", icon: Send },
+    { id: "triage", label: "Triage Queue", icon: Filter },
     { id: "agenda", label: "Agenda Builder", icon: FileText },
     { id: "committees", label: "Committees", icon: Users },
     { id: "kpis", label: "Board KPIs", icon: TrendingUp },
@@ -3850,6 +4332,8 @@ function BoardManagementView() {
 
       {/* Submissions Workspace Sub-Tab — Slice 3 */}
       {boardTab === "submissions" && <SubmissionWorkspace />}
+
+      {boardTab === "triage" && <RegistrarTriageQueue />}
 
       {/* Agenda Builder Sub-Tab — Interactive */}
       {boardTab === "agenda" && <AgendaBuilderInteractive />}
