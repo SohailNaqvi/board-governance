@@ -57,13 +57,24 @@ export interface StudentRecord {
   registrationNumber: string;
   name: string;
   programme: string;
+  programmeType: string;
   department: string;
   enrollmentDate: Date;
   status: string;
+  supervisorEmpId?: string;
 }
 
+/** @deprecated Use IStudentAcademicReader instead. */
 export interface IStudentReader {
   getByRegistrationNumber(regNo: string): Promise<StudentRecord | null>;
+}
+
+/** Spec-required reader for student academic data (4 methods). */
+export interface IStudentAcademicReader {
+  getByRegistrationNumber(regNo: string): Promise<StudentRecord | null>;
+  getByProgramme(programme: string): Promise<StudentRecord[]>;
+  getByDepartment(department: string): Promise<StudentRecord[]>;
+  getActiveBySupervisor(supervisorEmpId: string): Promise<StudentRecord[]>;
 }
 
 export interface SupervisorRecord {
@@ -71,13 +82,24 @@ export interface SupervisorRecord {
   employeeId: string;
   name: string;
   department: string;
+  specialization: string;
   highestQualification: {
     degree: string;
     level: string;
   };
   activeSupervisionCount: number;
+  maxSupervisionSlots: number;
 }
 
+/** @deprecated Use ISupervisorProfileReader instead. */
 export interface ISupervisorReader {
   getByEmployeeId(empId: string): Promise<SupervisorRecord | null>;
+}
+
+/** Spec-required reader for supervisor profile data (4 methods). */
+export interface ISupervisorProfileReader {
+  getByEmployeeId(empId: string): Promise<SupervisorRecord | null>;
+  getByDepartment(department: string): Promise<SupervisorRecord[]>;
+  getAvailableForSupervision(): Promise<SupervisorRecord[]>;
+  getBySpecialization(specialization: string): Promise<SupervisorRecord[]>;
 }

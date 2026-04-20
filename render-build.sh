@@ -34,6 +34,12 @@ node prisma/migrate-asrb-slice1-completion.mjs
 echo "=== Seeding ASRB cases ==="
 node prisma/seed-asrb-cases.mjs
 
+echo "=== Running Slice 3 prerequisites migration ==="
+node prisma/migrate-remediation-slice3-prereqs.mjs
+
+echo "=== Seeding Slice 3 prerequisites ==="
+node prisma/seed-remediation-slice3-prereqs.mjs
+
 echo "=== Building Next.js ==="
 cd apps/web
 npx next build

@@ -21,6 +21,11 @@ export const Permissions = {
   ASRB_VIEW_CASES: "ASRB_VIEW_CASES",
   ASRB_VET_CASES: "ASRB_VET_CASES",
   ASRB_CHAIR_MEETING: "ASRB_CHAIR_MEETING",
+  ASRB_VET_CASE: "ASRB_VET_CASE",
+  ASRB_APPROVE_AGENDA: "ASRB_APPROVE_AGENDA",
+  ASRB_RECORD_DECISION: "ASRB_RECORD_DECISION",
+  ASRB_VIEW_MEMBER_PORTAL: "ASRB_VIEW_MEMBER_PORTAL",
+  ASRB_ACK_NOTIFICATION: "ASRB_ACK_NOTIFICATION",
 
   // System permissions
   SYSTEM_ADMIN: "SYSTEM_ADMIN",
@@ -65,6 +70,46 @@ export const RolePermissions: Record<string, PermissionCode[]> = {
     Permissions.SYSTEM_ADMIN,
     Permissions.ASRB_MANAGE_RULES,
     Permissions.ASRB_VIEW_CASES,
+  ],
+  // ASRB roles (Section 6)
+  ASRB_CHAIR: [
+    Permissions.ASRB_CHAIR_MEETING,
+    Permissions.ASRB_VIEW_CASES,
+    Permissions.ASRB_APPROVE_AGENDA,
+    Permissions.ASRB_RECORD_DECISION,
+    Permissions.ASRB_VIEW_MEMBER_PORTAL,
+  ],
+  ASRB_SECRETARY: [
+    Permissions.ASRB_VIEW_CASES,
+    Permissions.ASRB_VET_CASE,
+    Permissions.ASRB_APPROVE_AGENDA,
+    Permissions.ASRB_RECORD_DECISION,
+    Permissions.ASRB_VIEW_MEMBER_PORTAL,
+    Permissions.ASRB_ACK_NOTIFICATION,
+  ],
+  ASRB_INTERNAL_MEMBER: [
+    Permissions.ASRB_VIEW_CASES,
+    Permissions.ASRB_VIEW_MEMBER_PORTAL,
+    Permissions.ASRB_ACK_NOTIFICATION,
+  ],
+  ASRB_EXTERNAL_MEMBER: [
+    Permissions.ASRB_VIEW_CASES,
+    Permissions.ASRB_VIEW_MEMBER_PORTAL,
+    Permissions.ASRB_ACK_NOTIFICATION,
+  ],
+  ASRB_COMPLIANCE_OFFICER: [
+    Permissions.ASRB_VIEW_CASES,
+    Permissions.ASRB_MANAGE_RULES,
+    Permissions.ASRB_VET_CASE,
+  ],
+  ASRB_VETTING_OFFICER: [
+    Permissions.ASRB_VIEW_CASES,
+    Permissions.ASRB_VET_CASE,
+    Permissions.ASRB_VET_CASES,
+  ],
+  ASRB_NOTIFICATION_RECIPIENT: [
+    Permissions.ASRB_VIEW_CASES,
+    Permissions.ASRB_ACK_NOTIFICATION,
   ],
 };
 
