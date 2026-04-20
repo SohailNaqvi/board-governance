@@ -78,3 +78,30 @@ export enum FeederBodyType {
   DGSC = "DGSC",
   FACULTY_BOARD = "FACULTY_BOARD",
 }
+
+export enum RuleSource {
+  HEC = "HEC",
+  UNIVERSITY = "UNIVERSITY",
+  FACULTY = "FACULTY",
+  PROGRAMME = "PROGRAMME",
+}
+
+export enum RuleSeverity {
+  BLOCKING = "BLOCKING",
+  WARNING = "WARNING",
+  INFORMATIONAL = "INFORMATIONAL",
+}
+
+export enum RuleOutcome {
+  PASS = "PASS",
+  FAIL = "FAIL",
+  WARN = "WARN",
+  NOT_APPLICABLE = "NOT_APPLICABLE",
+  ERROR = "ERROR",
+}
+
+export enum ComplianceStatus {
+  COMPLIANT = "COMPLIANT",
+  NEEDS_REVIEW = "NEEDS_REVIEW",
+  NON_COMPLIANT = "NON_COMPLIANT",
+}

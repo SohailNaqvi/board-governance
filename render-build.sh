@@ -28,6 +28,12 @@ echo "=== Running ASRB Slice 2 DB migration ==="
 # ASRB tables and feeder clients
 node prisma/migrate-asrb-slice2.mjs
 
+echo "=== Running ASRB Slice 1 completion migration ==="
+node prisma/migrate-asrb-slice1-completion.mjs
+
+echo "=== Seeding ASRB cases ==="
+node prisma/seed-asrb-cases.mjs
+
 echo "=== Building Next.js ==="
 cd apps/web
 npx next build
