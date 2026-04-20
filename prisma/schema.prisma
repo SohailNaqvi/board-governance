@@ -448,6 +448,7 @@ model ASRBCase {
 
   attachments           CaseAttachment[]
   auditEvents           CaseAuditEvent[]
+  complianceEvaluations ComplianceEvaluation[]
   feederClient          FeederClient    @relation(fields: [feederClientId], references: [id])
 
   @@unique([feederClientId, idempotencyKey])
@@ -509,4 +510,99 @@ model FeederClient {
 
   @@index([apiKeyHash])
   @@index([feederBodyCode])
+}
+
+enum RuleSource {
+  HEC
+  UNIVERSITY
+  FACULTY
+  PROGRAMME
+}
+
+enum RuleSeverity {
+  BLOCKING
+  WARNING
+  INFORMATIONAL
+}
+
+enum RuleOutcome {
+  PASS
+  FAIL
+  WARN
+  NOT_APPLICABLE
+  ERROR
+}
+
+enum ComplianceStatus {
+  COMPLIANT
+  NEEDS_REVIEW
+  NON_COMPLIANT
+}
+
+// ============ Compliance Entities ============
+
+model ComplianceRule {
+  id                        String       @id @default(cuid())
+  ruleId                    String       // Stable identifier across versions, e.g. HEC_PHD_SUPERVISOR_QUALIFICATION
+  source                    RuleSource
+  sourceReference           String?      // Citation, e.g. "HEC PhD Policy 2023, Section 4.2"
+  appliesToCaseTypes        String       // JSON array of CaseType values
+  appliesToProgrammeTypes   String?      // JSON array of programme type codes
+  severity                  RuleSeverity
+  evaluation                String       // JSON predicate expression
+  messageTemplate           String       // Human-readable with placeholders
+  effectiveFrom             DateTime?
+  effectiveTo               DateTime?
+  version                   Int          @default(1)
+  status                    String       @default("DRAFT") // DRAFT, EFFECTIVE, RETIRED
+  lastEditedBy              String?
+  lastEditedAt              DateTime?
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+
+  ruleEvaluations           RuleEvaluation[]
+
+  @@unique([ruleId, version])
+  @@index([ruleId])
+  @@index([source])
+  @@index([status])
+  @@index([effectiveFrom])
+  @@index([effectiveTo])
+}
+
+model ComplianceEvaluation {
+  id                String           @id @default(cuid())
+  caseId            String
+  status            ComplianceStatus
+  evaluatedAt       DateTime         @default(now())
+  rulesVersionSet   String           // JSON: snapshot of rule versions used
+  summary           String?          // JSON: aggregate summary
+  createdAt         DateTime         @default(now())
+
+  case              ASRBCase         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  ruleEvaluations   RuleEvaluation[]
+
+  @@index([caseId])
+  @@index([status])
+  @@index([evaluatedAt])
+}
+
+model RuleEvaluation {
+  id               String              @id @default(cuid())
+  evaluationId     String
+  ruleId           String              // Matches ComplianceRule.ruleId
+  ruleVersion      Int
+  complianceRuleId String?             // FK to the specific ComplianceRule record
+  outcome          RuleOutcome
+  evidence         String?             // JSON: observed values
+  message          String?             // Rendered message
+  createdAt        DateTime            @default(now())
+
+  evaluation       ComplianceEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  complianceRule   ComplianceRule?      @relation(fields: [complianceRuleId], references: [id])
+
+  @@index([evaluationId])
+  @@index([ruleId])
+  @@index([outcome])
+  @@index([complianceRuleId])
 }
