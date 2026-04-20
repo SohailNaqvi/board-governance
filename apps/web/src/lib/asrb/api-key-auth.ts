@@ -1,6 +1,23 @@
-import { createHash } from "crypto";
+import * as argon2 from "argon2";
 import prisma from "../prisma";
 import { CaseType } from "@ums/domain";
+
+/**
+ * API Key Authentication using argon2id.
+ *
+ * Work-factor rationale (OWASP 2024 recommendation for argon2id):
+ *   memoryCost  = 19456 KiB  (~19 MB) — balances security and server RAM
+ *   timeCost    = 2           — two iterations; sufficient with 19 MB memory
+ *   parallelism = 1           — single-threaded; avoids contention under load
+ *
+ * See ADR 0004-api-key-hashing.md for the full decision record.
+ */
+export const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
+  type: argon2.argon2id,
+  memoryCost: 19456, // ~19 MB
+  timeCost: 2,
+  parallelism: 1,
+};
 
 export interface FeederClientContext {
   id: string;
@@ -19,6 +36,24 @@ interface RateLimitEntry {
 // In-memory rate limiter: Map of clientId -> {count, windowStart}
 const rateLimitMap = new Map<string, RateLimitEntry>();
 
+/**
+ * Hash an API key with argon2id for storage.
+ * Used during key provisioning / seeding.
+ */
+export async function hashAPIKey(rawKey: string): Promise<string> {
+  return argon2.hash(rawKey, ARGON2_OPTIONS);
+}
+
+/**
+ * Verify a raw API key against an argon2id hash.
+ */
+export async function verifyAPIKey(
+  storedHash: string,
+  rawKey: string
+): Promise<boolean> {
+  return argon2.verify(storedHash, rawKey);
+}
+
 export async function authenticateAPIKey(
   authHeader: string | undefined
 ): Promise<FeederClientContext | null> {
@@ -27,30 +62,35 @@ export async function authenticateAPIKey(
   }
 
   const token = authHeader.substring(7);
-  const hashedKey = createHash("sha256").update(token).digest("hex");
 
-  const feederClient = await prisma.feederClient.findFirst({
-    where: { apiKeyHash: hashedKey },
+  // Retrieve all active feeder clients and verify against each.
+  // With a small number of feeder clients (<100) this is acceptable.
+  // For large-scale deployments, consider a key-prefix lookup strategy.
+  const activeClients = await prisma.feederClient.findMany({
+    where: { active: true },
   });
 
-  if (!feederClient || !feederClient.active) {
-    return null;
+  for (const feederClient of activeClients) {
+    const matches = await verifyAPIKey(feederClient.apiKeyHash, token);
+    if (matches) {
+      // Update last used timestamp
+      await prisma.feederClient.update({
+        where: { id: feederClient.id },
+        data: { lastUsedAt: new Date() },
+      });
+
+      return {
+        id: feederClient.id,
+        displayName: feederClient.displayName,
+        feederBodyCode: feederClient.feederBodyCode,
+        feederBodyType: feederClient.feederBodyType,
+        permittedCaseTypes: JSON.parse(feederClient.permittedCaseTypes),
+        rateLimitPerMinute: feederClient.rateLimitOverride || 60,
+      };
+    }
   }
 
-  // Update last used timestamp
-  await prisma.feederClient.update({
-    where: { id: feederClient.id },
-    data: { lastUsedAt: new Date() },
-  });
-
-  return {
-    id: feederClient.id,
-    displayName: feederClient.displayName,
-    feederBodyCode: feederClient.feederBodyCode,
-    feederBodyType: feederClient.feederBodyType,
-    permittedCaseTypes: JSON.parse(feederClient.permittedCaseTypes),
-    rateLimitPerMinute: feederClient.rateLimitOverride || 60,
-  };
+  return null;
 }
 
 export function checkRateLimit(clientId: string, limit: number): boolean {

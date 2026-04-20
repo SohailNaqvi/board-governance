@@ -40,6 +40,9 @@ node prisma/migrate-remediation-slice3-prereqs.mjs
 echo "=== Seeding Slice 3 prerequisites ==="
 node prisma/seed-remediation-slice3-prereqs.mjs
 
+echo "=== Migrating API key hashes to argon2id ==="
+node prisma/migrate-argon2id-api-keys.mjs
+
 echo "=== Building Next.js ==="
 cd apps/web
 npx next build
