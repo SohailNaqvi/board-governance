@@ -12,6 +12,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    server: {
+      deps: {
+        // argon2 is a native C addon installed under apps/web; must be loaded
+        // as an external module rather than transformed by Vite's pipeline.
+        external: ["argon2"],
+      },
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

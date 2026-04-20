@@ -1,6 +1,15 @@
 import pg from "pg";
-import { createHash } from "crypto";
+import argon2 from "argon2";
+import { randomBytes } from "crypto";
 const { Client } = pg;
+
+// argon2id work parameters — must match api-key-auth.ts ARGON2_OPTIONS
+const ARGON2_OPTIONS = {
+  type: argon2.argon2id,
+  memoryCost: 19456, // ~19 MB
+  timeCost: 2,
+  parallelism: 1,
+};
 
 const client = new Client({
   connectionString: process.env.DATABASE_URL,
@@ -154,9 +163,20 @@ async function migrate() {
   await client.query(`CREATE INDEX IF NOT EXISTS "CaseAuditEvent_caseId_idx" ON "CaseAuditEvent" ("caseId")`);
   await client.query(`CREATE INDEX IF NOT EXISTS "CaseAuditEvent_eventType_idx" ON "CaseAuditEvent" ("eventType")`);
 
-  // Seed FeederClient records
-  const dgscKeyHash = createHash("sha256").update("dgsc-test-key-2026").digest("hex");
-  const facultyBoardKeyHash = createHash("sha256").update("faculty-board-test-key-2026").digest("hex");
+  // Seed FeederClient records with argon2id-hashed API keys.
+  // DEV-ONLY: deterministic test keys are printed to stdout.
+  // In production, use randomly generated keys via migrate-argon2id-api-keys.mjs.
+  const DGSC_TEST_KEY = "dgsc_test_key_2026_argon2id";
+  const FB_TEST_KEY = "fb_test_key_2026_argon2id";
+
+  const dgscKeyHash = await argon2.hash(DGSC_TEST_KEY, ARGON2_OPTIONS);
+  const facultyBoardKeyHash = await argon2.hash(FB_TEST_KEY, ARGON2_OPTIONS);
+
+  console.log("=".repeat(60));
+  console.log("DEV TEST API KEYS (use these in .env or API clients):");
+  console.log(`  DGSC:          ${DGSC_TEST_KEY}`);
+  console.log(`  FACULTY_BOARD: ${FB_TEST_KEY}`);
+  console.log("=".repeat(60));
 
   const dgscPermittedTypes = JSON.stringify([
     "SYNOPSIS_APPROVAL",
