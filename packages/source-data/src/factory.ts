@@ -3,18 +3,25 @@ import type {
   IFinanceReader,
   IAcademicReader,
   IResolutionReader,
+  IStudentAcademicReader,
+  ISupervisorProfileReader,
 } from "./interfaces";
 import {
   MockHRDirectoryReader,
   MockFinanceReader,
   MockAcademicReader,
   MockResolutionReader,
+  MockStudentAcademicReader,
+  MockSupervisorProfileReader,
+  MockASRBResolutionReader,
 } from "./mock-reader";
 import {
   WarehouseHRDirectoryReader,
   WarehouseFinanceReader,
   WarehouseAcademicReader,
   WarehouseResolutionReader,
+  WarehouseStudentAcademicReader,
+  WarehouseSupervisorProfileReader,
 } from "./warehouse-reader";
 
 export type DataProviderType = "mock" | "warehouse";
@@ -24,6 +31,9 @@ export interface ReaderFactory {
   finance: IFinanceReader;
   academic: IAcademicReader;
   resolution: IResolutionReader;
+  studentAcademic: IStudentAcademicReader;
+  supervisorProfile: ISupervisorProfileReader;
+  asrbResolution: IResolutionReader;
 }
 
 export function createReader(
@@ -36,6 +46,9 @@ export function createReader(
       finance: new MockFinanceReader(),
       academic: new MockAcademicReader(),
       resolution: new MockResolutionReader(),
+      studentAcademic: new MockStudentAcademicReader(),
+      supervisorProfile: new MockSupervisorProfileReader(),
+      asrbResolution: new MockASRBResolutionReader(),
     };
   }
 
@@ -48,6 +61,9 @@ export function createReader(
       finance: new WarehouseFinanceReader(warehouseUrl),
       academic: new WarehouseAcademicReader(warehouseUrl),
       resolution: new WarehouseResolutionReader(warehouseUrl),
+      studentAcademic: new WarehouseStudentAcademicReader(warehouseUrl),
+      supervisorProfile: new WarehouseSupervisorProfileReader(warehouseUrl),
+      asrbResolution: new WarehouseResolutionReader(warehouseUrl),
     };
   }
 

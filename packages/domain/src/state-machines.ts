@@ -3,6 +3,7 @@ import {
   WorkingPaperStatus,
   ActionTakenEntryStatus,
   ASRBCaseStatus,
+  ComplianceEvaluationStatus,
 } from "./enums";
 
 // Transition matrices for state machines
@@ -166,7 +167,26 @@ export function canTransitionASRBCase(
   return validTransitions.includes(to);
 }
 
+const complianceEvaluationTransitions: Record<
+  ComplianceEvaluationStatus,
+  ComplianceEvaluationStatus[]
+> = {
+  [ComplianceEvaluationStatus.IN_PROGRESS]: [
+    ComplianceEvaluationStatus.COMPLETE,
+  ],
+  [ComplianceEvaluationStatus.COMPLETE]: [],
+};
+
+export function canTransitionComplianceEvaluation(
+  from: ComplianceEvaluationStatus,
+  to: ComplianceEvaluationStatus
+): boolean {
+  const validTransitions = complianceEvaluationTransitions[from] || [];
+  return validTransitions.includes(to);
+}
+
 export const agendaItemTransitionMatrix = agendaItemTransitions;
 export const workingPaperTransitionMatrix = workingPaperTransitions;
 export const actionTakenEntryTransitionMatrix = actionTakenEntryTransitions;
 export const asrbCaseTransitionMatrix = asrbCaseTransitions;
+export const complianceEvaluationTransitionMatrix = complianceEvaluationTransitions;

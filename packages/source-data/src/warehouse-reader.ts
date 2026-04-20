@@ -7,6 +7,10 @@ import type {
   AcademicRecord,
   IResolutionReader,
   ResolutionRecord,
+  IStudentAcademicReader,
+  StudentRecord,
+  ISupervisorProfileReader,
+  SupervisorRecord,
 } from "./interfaces";
 
 export class NotImplementedError extends Error {
@@ -82,6 +86,62 @@ export class WarehouseResolutionReader implements IResolutionReader {
   async getByNumber(number: number): Promise<ResolutionRecord | null> {
     throw new NotImplementedError(
       "WarehouseResolutionReader.getByNumber not yet implemented"
+    );
+  }
+}
+
+export class WarehouseStudentAcademicReader implements IStudentAcademicReader {
+  constructor(private warehouseUrl: string) {}
+
+  async getByRegistrationNumber(regNo: string): Promise<StudentRecord | null> {
+    throw new NotImplementedError(
+      "WarehouseStudentAcademicReader.getByRegistrationNumber not yet implemented"
+    );
+  }
+
+  async getByProgramme(programme: string): Promise<StudentRecord[]> {
+    throw new NotImplementedError(
+      "WarehouseStudentAcademicReader.getByProgramme not yet implemented"
+    );
+  }
+
+  async getByDepartment(department: string): Promise<StudentRecord[]> {
+    throw new NotImplementedError(
+      "WarehouseStudentAcademicReader.getByDepartment not yet implemented"
+    );
+  }
+
+  async getActiveBySupervisor(supervisorEmpId: string): Promise<StudentRecord[]> {
+    throw new NotImplementedError(
+      "WarehouseStudentAcademicReader.getActiveBySupervisor not yet implemented"
+    );
+  }
+}
+
+export class WarehouseSupervisorProfileReader implements ISupervisorProfileReader {
+  constructor(private warehouseUrl: string) {}
+
+  async getByEmployeeId(empId: string): Promise<SupervisorRecord | null> {
+    throw new NotImplementedError(
+      "WarehouseSupervisorProfileReader.getByEmployeeId not yet implemented"
+    );
+  }
+
+  async getByDepartment(department: string): Promise<SupervisorRecord[]> {
+    throw new NotImplementedError(
+      "WarehouseSupervisorProfileReader.getByDepartment not yet implemented"
+    );
+  }
+
+  async getAvailableForSupervision(): Promise<SupervisorRecord[]> {
+    throw new NotImplementedError(
+      "WarehouseSupervisorProfileReader.getAvailableForSupervision not yet implemented"
+    );
+  }
+
+  async getBySpecialization(specialization: string): Promise<SupervisorRecord[]> {
+    throw new NotImplementedError(
+      "WarehouseSupervisorProfileReader.getBySpecialization not yet implemented"
     );
   }
 }

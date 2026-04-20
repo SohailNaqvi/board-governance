@@ -4,9 +4,8 @@ import logger from "../logger";
 import { generateReceiptReference } from "./receipt";
 import { FeederClientContext } from "./api-key-auth";
 import {
-  MockStudentReader,
-  MockSupervisorReader,
-  MockASRBResolutionReader,
+  createReader,
+  type DataProviderType,
 } from "@ums/source-data";
 import type { CaseIntakeEnvelope } from "./schemas";
 
@@ -124,9 +123,11 @@ async function validateReferences(envelope: CaseIntakeEnvelope): Promise<{
   errors: string[];
 }> {
   const errors: string[] = [];
-  const studentReader = new MockStudentReader();
-  const supervisorReader = new MockSupervisorReader();
-  const resolutionReader = new MockASRBResolutionReader();
+  const providerType = (process.env.SOURCE_DATA_PROVIDER || "mock") as DataProviderType;
+  const readers = createReader(providerType, process.env.WAREHOUSE_URL);
+  const studentReader = readers.studentAcademic;
+  const supervisorReader = readers.supervisorProfile;
+  const resolutionReader = readers.asrbResolution;
 
   // Validate student reference if provided
   if (envelope.student_ref) {
