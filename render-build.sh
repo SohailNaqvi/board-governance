@@ -20,28 +20,19 @@ cd ../..
 mv pnpm-lock.yaml.bak pnpm-lock.yaml
 mv pnpm-workspace.yaml.bak pnpm-workspace.yaml
 
-echo "=== Running Slice 2 DB migration ==="
-# pg is in root dependencies, installed by pnpm install above
-node prisma/migrate-slice2.mjs
+echo "=== Running Prisma migrations ==="
+# On first deploy after adopting Prisma Migrate, run:
+#   npx prisma migrate resolve --applied "0_initial_asrb_baseline"
+# to mark the baseline as already applied. Subsequent deploys just use:
+cd apps/web
+npx prisma@5.22.0 migrate deploy --schema=../../prisma/schema.prisma
+cd ../..
 
-echo "=== Running ASRB Slice 2 DB migration ==="
-# ASRB tables and feeder clients
-node prisma/migrate-asrb-slice2.mjs
-
-echo "=== Running ASRB Slice 1 completion migration ==="
-node prisma/migrate-asrb-slice1-completion.mjs
-
-echo "=== Seeding ASRB cases ==="
+echo "=== Seeding data ==="
+# Feeder clients must be seeded before cases (cases reference feeder client IDs)
+node prisma/seed-feeder-clients.mjs
 node prisma/seed-asrb-cases.mjs
-
-echo "=== Running Slice 3 prerequisites migration ==="
-node prisma/migrate-remediation-slice3-prereqs.mjs
-
-echo "=== Seeding Slice 3 prerequisites ==="
 node prisma/seed-remediation-slice3-prereqs.mjs
-
-echo "=== Migrating API key hashes to argon2id ==="
-node prisma/migrate-argon2id-api-keys.mjs
 
 echo "=== Building Next.js ==="
 cd apps/web

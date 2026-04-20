@@ -28,13 +28,29 @@ pnpm test -- --coverage
 
 ## Database Migrations
 
-After modifying `prisma/schema.prisma`:
+This project uses **Prisma Migrate** for all schema changes. See [ADR 0005](docs/adr/0005-prisma-migrate-adoption.md) for the full rationale.
+
+**Creating a new migration (development):**
 
 ```bash
-pnpm db:migrate
+# 1. Edit prisma/schema.prisma
+# 2. Generate and apply the migration
+npx prisma migrate dev --name descriptive_name --schema=prisma/schema.prisma
+# 3. Review the generated SQL in prisma/migrations/<timestamp>_descriptive_name/migration.sql
+# 4. Commit the entire prisma/migrations/<timestamp>_.../ directory to version control
 ```
 
-Commit the migration files to version control.
+**Applying migrations in CI / production (Render):**
+
+Migrations are applied automatically during the Render build via `prisma migrate deploy` in `render-build.sh`. This command applies only unapplied migrations and never generates new ones.
+
+**Rules:**
+
+- Never modify an already-committed migration file. Create a new migration instead.
+- Never use ad-hoc SQL scripts for schema changes. All DDL goes through Prisma Migrate.
+- Data-only seed scripts (e.g., `seed-feeder-clients.mjs`) remain in `prisma/` and are run after migrations.
+- One-time data migrations (e.g., key rotation) go in `scripts/one-time/` with a README.
+- Historical ad-hoc SQL scripts are archived in `prisma/historical-sql/` for audit reference.
 
 ## Package Scope Convention
 
