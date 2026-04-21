@@ -11,6 +11,9 @@ import type {
   StudentRecord,
   ISupervisorProfileReader,
   SupervisorRecord,
+  IProgrammeProfileReader,
+  ProgrammeRecord,
+  IRecognizedInstitutionReader,
 } from "./interfaces";
 
 export class NotImplementedError extends Error {
@@ -142,6 +145,38 @@ export class WarehouseSupervisorProfileReader implements ISupervisorProfileReade
   async getBySpecialization(specialization: string): Promise<SupervisorRecord[]> {
     throw new NotImplementedError(
       "WarehouseSupervisorProfileReader.getBySpecialization not yet implemented"
+    );
+  }
+}
+
+export class WarehouseProgrammeProfileReader implements IProgrammeProfileReader {
+  constructor(private warehouseUrl: string) {}
+
+  async getByCode(code: string): Promise<ProgrammeRecord | null> {
+    throw new NotImplementedError(
+      "WarehouseProgrammeProfileReader.getByCode not yet implemented"
+    );
+  }
+
+  async getByDepartment(department: string): Promise<ProgrammeRecord[]> {
+    throw new NotImplementedError(
+      "WarehouseProgrammeProfileReader.getByDepartment not yet implemented"
+    );
+  }
+
+  async getByType(type: string): Promise<ProgrammeRecord[]> {
+    throw new NotImplementedError(
+      "WarehouseProgrammeProfileReader.getByType not yet implemented"
+    );
+  }
+}
+
+export class WarehouseRecognizedInstitutionReader implements IRecognizedInstitutionReader {
+  constructor(private warehouseUrl: string) {}
+
+  async isRecognized(name: string, country: string): Promise<boolean> {
+    throw new NotImplementedError(
+      "WarehouseRecognizedInstitutionReader.isRecognized not yet implemented"
     );
   }
 }

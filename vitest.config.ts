@@ -7,6 +7,9 @@ export default defineConfig({
       "@ums/domain": path.resolve(__dirname, "packages/domain/src"),
       "@ums/source-data": path.resolve(__dirname, "packages/source-data/src"),
       "@ums/audit": path.resolve(__dirname, "packages/audit/src"),
+      "@ums/compliance": path.resolve(__dirname, "packages/compliance/src"),
+      // zod lives in the pnpm store; resolve via the compliance package dependency chain
+      "zod": path.resolve(__dirname, "node_modules/.pnpm/zod@3.25.76/node_modules/zod"),
     },
   },
   test: {

@@ -13,6 +13,9 @@ import type {
   SupervisorRecord,
   ISupervisorReader,
   ISupervisorProfileReader,
+  ProgrammeRecord,
+  IProgrammeProfileReader,
+  IRecognizedInstitutionReader,
 } from "./interfaces";
 
 // Deterministic seed data for testing
@@ -104,6 +107,9 @@ const mockStudentData: StudentRecord[] = [
     enrollmentDate: new Date("2022-07-01"),
     status: "ACTIVE",
     supervisorEmpId: "EMP-CSE-001",
+    courseworkCompleted: true,
+    comprehensiveExamStatus: "PASSED",
+    comprehensiveExamDate: new Date("2023-06-15"),
   },
   {
     id: "std-002",
@@ -115,6 +121,9 @@ const mockStudentData: StudentRecord[] = [
     enrollmentDate: new Date("2022-08-15"),
     status: "ACTIVE",
     supervisorEmpId: "EMP-PHY-001",
+    courseworkCompleted: true,
+    comprehensiveExamStatus: "NOT_TAKEN",
+    comprehensiveExamDate: null,
   },
   {
     id: "std-003",
@@ -126,6 +135,9 @@ const mockStudentData: StudentRecord[] = [
     enrollmentDate: new Date("2023-07-01"),
     status: "ACTIVE",
     supervisorEmpId: "EMP-MATH-001",
+    courseworkCompleted: true,
+    comprehensiveExamStatus: "PASSED",
+    comprehensiveExamDate: new Date("2024-06-20"),
   },
   {
     id: "std-004",
@@ -137,6 +149,9 @@ const mockStudentData: StudentRecord[] = [
     enrollmentDate: new Date("2023-08-01"),
     status: "ACTIVE",
     supervisorEmpId: "EMP-CSE-001",
+    courseworkCompleted: false,
+    comprehensiveExamStatus: "NOT_TAKEN",
+    comprehensiveExamDate: null,
   },
   {
     id: "std-005",
@@ -148,6 +163,9 @@ const mockStudentData: StudentRecord[] = [
     enrollmentDate: new Date("2023-09-01"),
     status: "ACTIVE",
     supervisorEmpId: "EMP-PHY-001",
+    courseworkCompleted: true,
+    comprehensiveExamStatus: "NOT_TAKEN",
+    comprehensiveExamDate: null,
   },
   {
     id: "std-006",
@@ -159,6 +177,9 @@ const mockStudentData: StudentRecord[] = [
     enrollmentDate: new Date("2024-01-15"),
     status: "ACTIVE",
     supervisorEmpId: "EMP-CHEM-001",
+    courseworkCompleted: false,
+    comprehensiveExamStatus: "NOT_TAKEN",
+    comprehensiveExamDate: null,
   },
   {
     id: "std-007",
@@ -170,6 +191,9 @@ const mockStudentData: StudentRecord[] = [
     enrollmentDate: new Date("2024-02-01"),
     status: "ACTIVE",
     supervisorEmpId: "EMP-CSE-001",
+    courseworkCompleted: false,
+    comprehensiveExamStatus: "NOT_TAKEN",
+    comprehensiveExamDate: null,
   },
   {
     id: "std-008",
@@ -181,6 +205,9 @@ const mockStudentData: StudentRecord[] = [
     enrollmentDate: new Date("2024-03-01"),
     status: "ACTIVE",
     supervisorEmpId: "EMP-MATH-001",
+    courseworkCompleted: false,
+    comprehensiveExamStatus: "NOT_TAKEN",
+    comprehensiveExamDate: null,
   },
   {
     id: "std-009",
@@ -192,6 +219,9 @@ const mockStudentData: StudentRecord[] = [
     enrollmentDate: new Date("2021-07-01"),
     status: "COMPLETED",
     supervisorEmpId: "EMP-PHY-001",
+    courseworkCompleted: true,
+    comprehensiveExamStatus: "PASSED",
+    comprehensiveExamDate: new Date("2022-12-10"),
   },
   {
     id: "std-010",
@@ -203,6 +233,9 @@ const mockStudentData: StudentRecord[] = [
     enrollmentDate: new Date("2022-09-01"),
     status: "ACTIVE",
     supervisorEmpId: "EMP-CHEM-001",
+    courseworkCompleted: true,
+    comprehensiveExamStatus: "PASSED",
+    comprehensiveExamDate: new Date("2023-11-15"),
   },
 ];
 
@@ -219,6 +252,11 @@ const mockSupervisorData: SupervisorRecord[] = [
     },
     activeSupervisionCount: 3,
     maxSupervisionSlots: 5,
+    publications: [
+      { title: "Deep Learning for NLP", journal: "IEEE TPAMI", year: 2023, indexedIn: ["HEC-W", "Scopus", "ISI"] },
+      { title: "Transformer Architectures Survey", journal: "ACM Computing Surveys", year: 2024, indexedIn: ["HEC-W", "Scopus"] },
+      { title: "Federated Learning in Healthcare", journal: "Nature Machine Intelligence", year: 2024, indexedIn: ["HEC-W", "Scopus", "ISI"] },
+    ],
   },
   {
     id: "sup-002",
@@ -232,6 +270,10 @@ const mockSupervisorData: SupervisorRecord[] = [
     },
     activeSupervisionCount: 2,
     maxSupervisionSlots: 4,
+    publications: [
+      { title: "Quantum Entanglement Experiments", journal: "Physical Review Letters", year: 2022, indexedIn: ["HEC-W", "Scopus", "ISI"] },
+      { title: "Topological Quantum Computing", journal: "Nature Physics", year: 2023, indexedIn: ["HEC-W", "Scopus", "ISI"] },
+    ],
   },
   {
     id: "sup-003",
@@ -245,6 +287,9 @@ const mockSupervisorData: SupervisorRecord[] = [
     },
     activeSupervisionCount: 2,
     maxSupervisionSlots: 4,
+    publications: [
+      { title: "Prime Distribution in Arithmetic Progressions", journal: "Annals of Mathematics", year: 2023, indexedIn: ["HEC-W", "Scopus", "ISI"] },
+    ],
   },
   {
     id: "sup-004",
@@ -258,6 +303,10 @@ const mockSupervisorData: SupervisorRecord[] = [
     },
     activeSupervisionCount: 2,
     maxSupervisionSlots: 3,
+    publications: [
+      { title: "Green Synthesis of Nanoparticles", journal: "Chemical Reviews", year: 2024, indexedIn: ["HEC-W", "Scopus"] },
+      { title: "Catalytic Asymmetric Reactions", journal: "JACS", year: 2023, indexedIn: ["HEC-W", "Scopus", "ISI"] },
+    ],
   },
   {
     id: "sup-005",
@@ -271,6 +320,7 @@ const mockSupervisorData: SupervisorRecord[] = [
     },
     activeSupervisionCount: 0,
     maxSupervisionSlots: 5,
+    publications: [],
   },
 ];
 
@@ -427,5 +477,103 @@ export class MockASRBResolutionReader implements IResolutionReader {
       ...mockFacultyBoardResolutions,
     ];
     return allResolutions.find((r) => r.resolutionNumber === number) || null;
+  }
+}
+
+// ─── Programme Profile Mock ─────────────────────────────────────
+
+const mockProgrammeData: ProgrammeRecord[] = [
+  {
+    id: "prog-001",
+    code: "PHD-CS",
+    name: "PhD Computer Science",
+    type: "PhD",
+    department: "Computer Science",
+    faculty: "Faculty of Computing",
+    minimumDuration: 36,
+    maximumDuration: 96,
+    requiredCredits: 18,
+    ruleParameters: {
+      minHECPublications: 2,
+      plagiarismThreshold: 19,
+      requireComprehensiveExam: true,
+      maxExtensions: 2,
+    },
+  },
+  {
+    id: "prog-002",
+    code: "MPHIL-PHY",
+    name: "MPhil Physics",
+    type: "MPhil",
+    department: "Physics",
+    faculty: "Faculty of Sciences",
+    minimumDuration: 24,
+    maximumDuration: 48,
+    requiredCredits: 30,
+    ruleParameters: {
+      minHECPublications: 1,
+      plagiarismThreshold: 19,
+      requireComprehensiveExam: false,
+      maxExtensions: 1,
+    },
+  },
+  {
+    id: "prog-003",
+    code: "PHD-MATH",
+    name: "PhD Mathematics",
+    type: "PhD",
+    department: "Mathematics",
+    faculty: "Faculty of Sciences",
+    minimumDuration: 36,
+    maximumDuration: 96,
+    requiredCredits: 18,
+    ruleParameters: {
+      minHECPublications: 2,
+      plagiarismThreshold: 19,
+      requireComprehensiveExam: true,
+      maxExtensions: 2,
+    },
+  },
+];
+
+/** Spec-compliant mock with 3 programmes. */
+export class MockProgrammeProfileReader implements IProgrammeProfileReader {
+  async getByCode(code: string): Promise<ProgrammeRecord | null> {
+    return mockProgrammeData.find((p) => p.code === code) || null;
+  }
+
+  async getByDepartment(department: string): Promise<ProgrammeRecord[]> {
+    return mockProgrammeData.filter((p) => p.department === department);
+  }
+
+  async getByType(type: string): Promise<ProgrammeRecord[]> {
+    return mockProgrammeData.filter((p) => p.type === type);
+  }
+}
+
+// ─── Recognized Institution Mock ────────────────────────────────
+
+const mockRecognizedInstitutions = new Set([
+  "MIT|United States",
+  "Stanford University|United States",
+  "University of Cambridge|United Kingdom",
+  "University of Oxford|United Kingdom",
+  "ETH Zurich|Switzerland",
+  "Quaid-i-Azam University|Pakistan",
+  "LUMS|Pakistan",
+  "NUST|Pakistan",
+  "COMSATS University|Pakistan",
+  "University of Karachi|Pakistan",
+  "University of the Punjab|Pakistan",
+  "IIT Bombay|India",
+  "IIT Delhi|India",
+  "University of Tokyo|Japan",
+  "Tsinghua University|China",
+]);
+
+/** Mock institution recognition lookup with 15 institutions. */
+export class MockRecognizedInstitutionReader implements IRecognizedInstitutionReader {
+  async isRecognized(name: string, country: string): Promise<boolean> {
+    return mockRecognizedInstitutions.has(`${name}|${country}`);
   }
 }
