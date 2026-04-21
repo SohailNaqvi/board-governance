@@ -96,3 +96,22 @@ export {
 export type {
   EvaluationResult,
 } from "./predicate/evaluator.js";
+
+// ─── Catalog Service ────────────────────────────────────────────
+export {
+  CatalogService,
+  CatalogServiceError,
+} from "./catalog/catalog-service.js";
+
+export type {
+  ComplianceRuleRecord,
+  CreateRuleInput,
+  UpdateRuleInput,
+  IRuleStore,
+  RuleFilter,
+  RuleStatus,
+  ConflictInfo,
+} from "./catalog/types.js";
+
+// ─── Memory Store (for tests / development) ─────────────────────
+export { MemoryRuleStore } from "./catalog/memory-store.js";
