@@ -13,6 +13,16 @@ import {
   PredicateNodeSchema,
   type PredicateNode,
   type Operand,
+  type SafeFunction,
+  type ExistsNode,
+  type NotExistsNode,
+  type LenFunction,
+  type CountWhereFunction,
+  type YearsBetweenFunction,
+  type MonthsBetweenFunction,
+  type LowerFunction,
+  type UpperFunction,
+  type InstitutionRecognizedFunction,
   isRef,
   isSafeFunction,
   getNodeType,
@@ -124,10 +134,14 @@ function validateNode(
       validateOperand(operands[1], `${path}.${nodeType}[1]`, errors);
       break;
     }
-    case "exists":
+    case "exists": {
+      const attrPath = (node as ExistsNode).exists;
+      validateAttributePath(attrPath, `${path}.exists`, errors);
+      break;
+    }
     case "not_exists": {
-      const attrPath = (node as Record<string, string>)[nodeType]!;
-      validateAttributePath(attrPath, `${path}.${nodeType}`, errors);
+      const attrPath = (node as NotExistsNode).not_exists;
+      validateAttributePath(attrPath, `${path}.not_exists`, errors);
       break;
     }
     case "matches_regex": {
@@ -195,48 +209,56 @@ function validateAttributePath(
 }
 
 function validateSafeFunction(
-  func: Record<string, unknown>,
+  func: SafeFunction,
   path: string,
   errors: ValidationError[]
 ): void {
-  const key = Object.keys(func)[0];
-
-  switch (key) {
-    case "len": {
-      validateOperand(func.len as Operand, `${path}.len`, errors);
-      break;
-    }
-    case "count_where": {
-      const cw = func.count_where as { in: Operand; where: PredicateNode };
-      validateOperand(cw.in, `${path}.count_where.in`, errors);
-      // The where clause is a predicate node
-      validateNode(cw.where, `${path}.count_where.where`, 0, DEFAULT_MAX_DEPTH, errors);
-      break;
-    }
-    case "years_between":
-    case "months_between": {
-      const args = func[key] as [Operand, Operand];
-      validateOperand(args[0], `${path}.${key}[0]`, errors);
-      validateOperand(args[1], `${path}.${key}[1]`, errors);
-      break;
-    }
-    case "today":
-      // No operands
-      break;
-    case "lower":
-    case "upper": {
-      validateOperand(func[key] as Operand, `${path}.${key}`, errors);
-      break;
-    }
-    case "institution_recognized": {
-      const ir = func.institution_recognized as { name: Operand; country: Operand };
-      validateOperand(ir.name, `${path}.institution_recognized.name`, errors);
-      validateOperand(ir.country, `${path}.institution_recognized.country`, errors);
-      break;
-    }
-    default:
-      errors.push({ path, message: `Unknown safe function: "${key}"` });
+  if ("len" in func) {
+    const f = func as LenFunction;
+    validateOperand(f.len, `${path}.len`, errors);
+    return;
   }
+  if ("count_where" in func) {
+    const f = func as CountWhereFunction;
+    validateOperand(f.count_where.in, `${path}.count_where.in`, errors);
+    validateNode(f.count_where.where, `${path}.count_where.where`, 0, DEFAULT_MAX_DEPTH, errors);
+    return;
+  }
+  if ("years_between" in func) {
+    const f = func as YearsBetweenFunction;
+    validateOperand(f.years_between[0], `${path}.years_between[0]`, errors);
+    validateOperand(f.years_between[1], `${path}.years_between[1]`, errors);
+    return;
+  }
+  if ("months_between" in func) {
+    const f = func as MonthsBetweenFunction;
+    validateOperand(f.months_between[0], `${path}.months_between[0]`, errors);
+    validateOperand(f.months_between[1], `${path}.months_between[1]`, errors);
+    return;
+  }
+  if ("today" in func) {
+    // No operands to validate
+    return;
+  }
+  if ("lower" in func) {
+    const f = func as LowerFunction;
+    validateOperand(f.lower, `${path}.lower`, errors);
+    return;
+  }
+  if ("upper" in func) {
+    const f = func as UpperFunction;
+    validateOperand(f.upper, `${path}.upper`, errors);
+    return;
+  }
+  if ("institution_recognized" in func) {
+    const f = func as InstitutionRecognizedFunction;
+    validateOperand(f.institution_recognized.name, `${path}.institution_recognized.name`, errors);
+    validateOperand(f.institution_recognized.country, `${path}.institution_recognized.country`, errors);
+    return;
+  }
+  // Exhaustiveness guard
+  const _exhaustive: never = func;
+  errors.push({ path, message: `Unknown safe function` });
 }
 
 function validateRegex(

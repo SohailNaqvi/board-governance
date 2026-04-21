@@ -7,9 +7,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { verifySession } from "../../../../../lib/auth/session";
 import { hasPermission, Permissions } from "@ums/domain";
-import { CatalogService, CatalogServiceError } from "@ums/compliance";
+import { CatalogService, CatalogServiceError, type RuleFilter } from "@ums/compliance";
 import { createPrismaRuleStore } from "../../../../../lib/asrb/prisma-rule-store";
 import logger from "../../../../../lib/logger";
+
+const VALID_STATUSES = new Set(["DRAFT", "EFFECTIVE", "RETIRED"]);
 
 function getService() {
   return new CatalogService(createPrismaRuleStore());
@@ -35,15 +37,18 @@ export async function GET(request: NextRequest) {
     }
 
     const url = new URL(request.url);
-    const filter: Record<string, string | undefined> = {
+    const statusParam = url.searchParams.get("status") ?? undefined;
+    const filter: RuleFilter = {
       ruleId: url.searchParams.get("ruleId") ?? undefined,
       source: url.searchParams.get("source") ?? undefined,
-      status: url.searchParams.get("status") ?? undefined,
+      status: statusParam && VALID_STATUSES.has(statusParam)
+        ? (statusParam as RuleFilter["status"])
+        : undefined,
       caseType: url.searchParams.get("caseType") ?? undefined,
     };
 
     const service = getService();
-    const rules = await service.listRules(filter as any);
+    const rules = await service.listRules(filter);
 
     return NextResponse.json({ rules, count: rules.length });
   } catch (error) {

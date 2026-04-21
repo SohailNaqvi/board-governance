@@ -10,7 +10,18 @@
  * - Throws EvaluationError on runtime failures (missing refs, type mismatches)
  */
 
-import type { PredicateNode, Operand } from "./grammar.js";
+import type {
+  PredicateNode,
+  Operand,
+  SafeFunction,
+  LenFunction,
+  CountWhereFunction,
+  YearsBetweenFunction,
+  MonthsBetweenFunction,
+  LowerFunction,
+  UpperFunction,
+  InstitutionRecognizedFunction,
+} from "./grammar.js";
 import { getNodeType, isRef, isSafeFunction } from "./grammar.js";
 import type { CaseContext } from "./case-context.js";
 import { resolveRef } from "./case-context.js";
@@ -171,7 +182,7 @@ function resolveOperand(
   }
 
   if (isSafeFunction(operand)) {
-    return evalSafeFunction(operand as Record<string, unknown>, ctx, path, evidence);
+    return evalSafeFunction(operand, ctx, path, evidence);
   }
 
   // Literal or literal array — return as-is
@@ -179,98 +190,93 @@ function resolveOperand(
 }
 
 function evalSafeFunction(
-  func: Record<string, unknown>,
+  func: SafeFunction,
   ctx: CaseContext,
   path: string,
   evidence: Record<string, unknown>
 ): unknown {
-  const key = Object.keys(func)[0];
-
-  switch (key) {
-    case "len": {
-      const inner = resolveOperand(func.len as Operand, ctx, `${path}.len`, evidence);
-      if (Array.isArray(inner)) return inner.length;
-      if (typeof inner === "string") return inner.length;
-      throw new EvaluationError(`len requires array or string, got ${typeof inner}`, `${path}.len`);
-    }
-
-    case "count_where": {
-      const cw = func.count_where as { in: Operand; where: PredicateNode };
-      const collection = resolveOperand(cw.in, ctx, `${path}.count_where.in`, evidence);
-      if (!Array.isArray(collection)) {
-        throw new EvaluationError(`count_where requires array, got ${typeof collection}`, `${path}.count_where.in`);
-      }
-
-      let count = 0;
-      for (let i = 0; i < collection.length; i++) {
-        // Create a sub-context where "item" references the current element
-        const itemCtx = createItemContext(ctx, collection[i]);
-        if (evalNode(cw.where, itemCtx, `${path}.count_where.where[${i}]`, evidence)) {
-          count++;
-        }
-      }
-      return count;
-    }
-
-    case "years_between": {
-      const [a, b] = func.years_between as [Operand, Operand];
-      const dateA = toDate(resolveOperand(a, ctx, `${path}.years_between[0]`, evidence), `${path}.years_between[0]`);
-      const dateB = toDate(resolveOperand(b, ctx, `${path}.years_between[1]`, evidence), `${path}.years_between[1]`);
-      return yearsBetween(dateA, dateB);
-    }
-
-    case "months_between": {
-      const [a, b] = func.months_between as [Operand, Operand];
-      const dateA = toDate(resolveOperand(a, ctx, `${path}.months_between[0]`, evidence), `${path}.months_between[0]`);
-      const dateB = toDate(resolveOperand(b, ctx, `${path}.months_between[1]`, evidence), `${path}.months_between[1]`);
-      return monthsBetween(dateA, dateB);
-    }
-
-    case "today":
-      return new Date();
-
-    case "lower": {
-      const val = resolveOperand(func.lower as Operand, ctx, `${path}.lower`, evidence);
-      if (typeof val !== "string") {
-        throw new EvaluationError(`lower requires string, got ${typeof val}`, `${path}.lower`);
-      }
-      return val.toLowerCase();
-    }
-
-    case "upper": {
-      const val = resolveOperand(func.upper as Operand, ctx, `${path}.upper`, evidence);
-      if (typeof val !== "string") {
-        throw new EvaluationError(`upper requires string, got ${typeof val}`, `${path}.upper`);
-      }
-      return val.toUpperCase();
-    }
-
-    case "institution_recognized": {
-      // This returns a boolean but needs async in production.
-      // For the synchronous evaluator, we look up a pre-resolved flag
-      // in the context or treat it as a computed value.
-      // Convention: the CaseContext builder pre-resolves this into
-      // computed.institutionRecognized if the rule uses it.
-      const ir = func.institution_recognized as { name: Operand; country: Operand };
-      const name = resolveOperand(ir.name, ctx, `${path}.institution_recognized.name`, evidence);
-      const country = resolveOperand(ir.country, ctx, `${path}.institution_recognized.country`, evidence);
-      evidence["institution_recognized.name"] = name;
-      evidence["institution_recognized.country"] = country;
-
-      // Check pre-resolved lookup in computed context
-      const lookupKey = `institutionRecognized:${name}:${country}`;
-      const preResolved = ctx.computed[lookupKey];
-      if (preResolved !== undefined) return preResolved;
-
-      // If not pre-resolved, we can't do async lookup here.
-      // Return false with a warning in evidence.
-      evidence["institution_recognized.warning"] = "Not pre-resolved; defaulting to false";
-      return false;
-    }
-
-    default:
-      throw new EvaluationError(`Unknown safe function: ${key}`, path);
+  if ("len" in func) {
+    const f = func as LenFunction;
+    const inner = resolveOperand(f.len, ctx, `${path}.len`, evidence);
+    if (Array.isArray(inner)) return inner.length;
+    if (typeof inner === "string") return inner.length;
+    throw new EvaluationError(`len requires array or string, got ${typeof inner}`, `${path}.len`);
   }
+
+  if ("count_where" in func) {
+    const f = func as CountWhereFunction;
+    const collection = resolveOperand(f.count_where.in, ctx, `${path}.count_where.in`, evidence);
+    if (!Array.isArray(collection)) {
+      throw new EvaluationError(`count_where requires array, got ${typeof collection}`, `${path}.count_where.in`);
+    }
+
+    let count = 0;
+    for (let i = 0; i < collection.length; i++) {
+      const itemCtx = createItemContext(ctx, collection[i]);
+      if (evalNode(f.count_where.where, itemCtx, `${path}.count_where.where[${i}]`, evidence)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  if ("years_between" in func) {
+    const f = func as YearsBetweenFunction;
+    const [a, b] = f.years_between;
+    const dateA = toDate(resolveOperand(a, ctx, `${path}.years_between[0]`, evidence), `${path}.years_between[0]`);
+    const dateB = toDate(resolveOperand(b, ctx, `${path}.years_between[1]`, evidence), `${path}.years_between[1]`);
+    return yearsBetween(dateA, dateB);
+  }
+
+  if ("months_between" in func) {
+    const f = func as MonthsBetweenFunction;
+    const [a, b] = f.months_between;
+    const dateA = toDate(resolveOperand(a, ctx, `${path}.months_between[0]`, evidence), `${path}.months_between[0]`);
+    const dateB = toDate(resolveOperand(b, ctx, `${path}.months_between[1]`, evidence), `${path}.months_between[1]`);
+    return monthsBetween(dateA, dateB);
+  }
+
+  if ("today" in func) {
+    return new Date();
+  }
+
+  if ("lower" in func) {
+    const f = func as LowerFunction;
+    const val = resolveOperand(f.lower, ctx, `${path}.lower`, evidence);
+    if (typeof val !== "string") {
+      throw new EvaluationError(`lower requires string, got ${typeof val}`, `${path}.lower`);
+    }
+    return val.toLowerCase();
+  }
+
+  if ("upper" in func) {
+    const f = func as UpperFunction;
+    const val = resolveOperand(f.upper, ctx, `${path}.upper`, evidence);
+    if (typeof val !== "string") {
+      throw new EvaluationError(`upper requires string, got ${typeof val}`, `${path}.upper`);
+    }
+    return val.toUpperCase();
+  }
+
+  if ("institution_recognized" in func) {
+    const f = func as InstitutionRecognizedFunction;
+    const name = resolveOperand(f.institution_recognized.name, ctx, `${path}.institution_recognized.name`, evidence);
+    const country = resolveOperand(f.institution_recognized.country, ctx, `${path}.institution_recognized.country`, evidence);
+    evidence["institution_recognized.name"] = name;
+    evidence["institution_recognized.country"] = country;
+
+    const lookupKey = `institutionRecognized:${name}:${country}`;
+    const preResolved = ctx.computed[lookupKey];
+    if (preResolved !== undefined) return preResolved;
+
+    evidence["institution_recognized.warning"] = "Not pre-resolved; defaulting to false";
+    return false;
+  }
+
+  // Exhaustiveness: SafeFunction is a closed union, so this is unreachable
+  // if all members are handled above. The cast satisfies the compiler.
+  const _exhaustive: never = func;
+  throw new EvaluationError(`Unknown safe function`, path);
 }
 
 /**
