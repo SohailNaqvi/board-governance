@@ -1,0 +1,133 @@
+[
+  {
+    "ruleId": "HEC_PHD_SUPERVISOR_QUALIFICATION",
+    "source": "HEC",
+    "sourceReference": "HEC PhD Policy 2023, Section 4.2",
+    "appliesToCaseTypes": ["SYNOPSIS_APPROVAL", "SUPERVISOR_CHANGE"],
+    "severity": "BLOCKING",
+    "evaluation": {
+      "eq": [{ "ref": "supervisor.highestQualification.level" }, "Doctorate"]
+    },
+    "messageTemplate": "Supervisor must hold a doctoral degree. Current qualification level: {{supervisor.highestQualification.level}}"
+  },
+  {
+    "ruleId": "HEC_PHD_SUPERVISOR_PUBLICATIONS",
+    "source": "HEC",
+    "sourceReference": "HEC PhD Policy 2023, Section 4.3",
+    "appliesToCaseTypes": ["SYNOPSIS_APPROVAL", "SUPERVISOR_CHANGE"],
+    "severity": "BLOCKING",
+    "evaluation": {
+      "gte": [
+        {
+          "count_where": {
+            "in": { "ref": "supervisor.publications" },
+            "where": { "contains": [{ "ref": "item.indexedIn" }, "HEC-W"] }
+          }
+        },
+        { "ref": "programme.ruleParameters.minHECPublications" }
+      ]
+    },
+    "messageTemplate": "Supervisor must have at least {{programme.ruleParameters.minHECPublications}} HEC-recognized (W-category) publications"
+  },
+  {
+    "ruleId": "HEC_SUPERVISION_CAP",
+    "source": "HEC",
+    "sourceReference": "HEC PhD Policy 2023, Section 4.5",
+    "appliesToCaseTypes": ["SYNOPSIS_APPROVAL", "SUPERVISOR_CHANGE"],
+    "severity": "BLOCKING",
+    "evaluation": {
+      "lt": [
+        { "ref": "supervisor.activeSupervisionCount" },
+        { "ref": "supervisor.maxSupervisionSlots" }
+      ]
+    },
+    "messageTemplate": "Supervisor has reached maximum supervision capacity ({{supervisor.activeSupervisionCount}}/{{supervisor.maxSupervisionSlots}} slots)"
+  },
+  {
+    "ruleId": "HEC_PHD_COURSEWORK_PREREQUISITE",
+    "source": "HEC",
+    "sourceReference": "HEC PhD Policy 2023, Section 3.1",
+    "appliesToCaseTypes": ["SYNOPSIS_APPROVAL"],
+    "severity": "BLOCKING",
+    "evaluation": {
+      "eq": [{ "ref": "student.courseworkCompleted" }, true]
+    },
+    "messageTemplate": "Student must complete all required coursework before synopsis submission"
+  },
+  {
+    "ruleId": "HEC_PHD_COMPREHENSIVE_EXAM",
+    "source": "HEC",
+    "sourceReference": "HEC PhD Policy 2023, Section 3.2",
+    "appliesToCaseTypes": ["SYNOPSIS_APPROVAL"],
+    "appliesToProgrammeTypes": ["PhD"],
+    "severity": "BLOCKING",
+    "evaluation": {
+      "all": [
+        { "eq": [{ "ref": "programme.ruleParameters.requireComprehensiveExam" }, true] },
+        { "eq": [{ "ref": "student.comprehensiveExamStatus" }, "PASSED"] }
+      ]
+    },
+    "messageTemplate": "Student must pass the comprehensive examination before synopsis submission. Current status: {{student.comprehensiveExamStatus}}"
+  },
+  {
+    "ruleId": "HEC_PHD_MIN_ENROLLMENT_DURATION",
+    "source": "HEC",
+    "sourceReference": "HEC PhD Policy 2023, Section 2.3",
+    "appliesToCaseTypes": ["RESULT_APPROVAL"],
+    "severity": "BLOCKING",
+    "evaluation": {
+      "gte": [
+        { "months_between": [{ "ref": "student.enrollmentDate" }, { "today": {} }] },
+        { "ref": "programme.minimumDuration" }
+      ]
+    },
+    "messageTemplate": "Student has not met minimum enrollment duration of {{programme.minimumDuration}} months"
+  },
+  {
+    "ruleId": "HEC_PHD_MAX_ENROLLMENT_DURATION",
+    "source": "HEC",
+    "sourceReference": "HEC PhD Policy 2023, Section 2.4",
+    "appliesToCaseTypes": ["EXTENSION_CANDIDATURE"],
+    "severity": "WARNING",
+    "evaluation": {
+      "lte": [
+        { "months_between": [{ "ref": "student.enrollmentDate" }, { "today": {} }] },
+        { "ref": "programme.maximumDuration" }
+      ]
+    },
+    "messageTemplate": "Student enrollment duration exceeds maximum of {{programme.maximumDuration}} months — extension approval required"
+  },
+  {
+    "ruleId": "HEC_STUDENT_ACTIVE_STATUS",
+    "source": "HEC",
+    "sourceReference": "HEC General Policy, Section 1.1",
+    "appliesToCaseTypes": ["SYNOPSIS_APPROVAL", "GEC_CONSTITUTION", "EXAMINER_APPOINTMENT", "RESULT_APPROVAL", "SUPERVISOR_CHANGE", "TOPIC_CHANGE", "EXTENSION_CANDIDATURE", "LEAVE_ABSENCE", "COMPREHENSIVE_RESULT"],
+    "severity": "BLOCKING",
+    "evaluation": {
+      "eq": [{ "ref": "student.status" }, "ACTIVE"]
+    },
+    "messageTemplate": "Student must have ACTIVE status. Current status: {{student.status}}"
+  },
+  {
+    "ruleId": "HEC_REGISTRATION_FORMAT",
+    "source": "HEC",
+    "sourceReference": "HEC Data Standards 2023",
+    "appliesToCaseTypes": ["SYNOPSIS_APPROVAL", "GEC_CONSTITUTION", "EXAMINER_APPOINTMENT", "RESULT_APPROVAL"],
+    "severity": "WARNING",
+    "evaluation": {
+      "matches_regex": [{ "ref": "student.registrationNumber" }, "^REG-\\d{4}-\\d{3}$"]
+    },
+    "messageTemplate": "Student registration number does not match expected format REG-YYYY-NNN: {{student.registrationNumber}}"
+  },
+  {
+    "ruleId": "HEC_PLAGIARISM_THRESHOLD",
+    "source": "HEC",
+    "sourceReference": "HEC PhD Policy 2023, Section 5.1",
+    "appliesToCaseTypes": ["RESULT_APPROVAL"],
+    "severity": "BLOCKING",
+    "evaluation": {
+      "exists": "programme.ruleParameters.plagiarismThreshold"
+    },
+    "messageTemplate": "Programme must define a plagiarism similarity threshold in ruleParameters"
+  }
+]

@@ -1,0 +1,27 @@
+[
+  {
+    "ruleId": "UNI_SUPERVISOR_SAME_DEPARTMENT",
+    "source": "UNIVERSITY",
+    "sourceReference": "University Statute 2024, Chapter 8.3",
+    "appliesToCaseTypes": ["SYNOPSIS_APPROVAL", "SUPERVISOR_CHANGE"],
+    "severity": "WARNING",
+    "evaluation": {
+      "eq": [
+        { "ref": "supervisor.department" },
+        { "ref": "student.department" }
+      ]
+    },
+    "messageTemplate": "Supervisor ({{supervisor.department}}) is from a different department than the student ({{student.department}}). Cross-department supervision requires special approval."
+  },
+  {
+    "ruleId": "UNI_GEC_MINIMUM_MEMBERS",
+    "source": "UNIVERSITY",
+    "sourceReference": "University Statute 2024, Chapter 9.1",
+    "appliesToCaseTypes": ["GEC_CONSTITUTION"],
+    "severity": "INFORMATIONAL",
+    "evaluation": {
+      "eq": [{ "ref": "case.caseType" }, "GEC_CONSTITUTION"]
+    },
+    "messageTemplate": "GEC constitution cases should include at least 3 members as per university statute. Verify the case payload."
+  }
+]
