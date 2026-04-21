@@ -75,3 +75,24 @@ export type {
   AttributeType,
   AttributeEntry,
 } from "./predicate/attribute-catalog.js";
+
+// ─── Case Context ───────────────────────────────────────────────
+export {
+  buildComputedFields,
+  resolveRef,
+} from "./predicate/case-context.js";
+
+export type {
+  CaseSnapshot,
+  CaseContext,
+} from "./predicate/case-context.js";
+
+// ─── Predicate Evaluator ────────────────────────────────────────
+export {
+  evaluatePredicate,
+  EvaluationError,
+} from "./predicate/evaluator.js";
+
+export type {
+  EvaluationResult,
+} from "./predicate/evaluator.js";
