@@ -220,7 +220,7 @@ export const CaseIntakeEnvelopeSchema = z.object({
     })
     .optional(),
   case_type: z.nativeEnum(CaseType),
-  urgency: z.nativeEnum(CaseUrgency).default("NORMAL"),
+  urgency: z.nativeEnum(CaseUrgency).default(CaseUrgency.NORMAL),
   student_ref: z.string().min(1).optional(),
   supervisor_ref: z.string().min(1).optional(),
   programme_ref: z.string().min(1).optional(),

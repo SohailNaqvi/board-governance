@@ -10,9 +10,15 @@ import type {
   RuleFilter,
   RuleStatus,
 } from "@ums/compliance";
+import type {
+  ComplianceRule as PrismaComplianceRule,
+  RuleSource,
+  RuleSeverity,
+  Prisma,
+} from "@prisma/client";
 import prisma from "../prisma";
 
-function toDomain(row: any): ComplianceRuleRecord {
+function toDomain(row: PrismaComplianceRule): ComplianceRuleRecord {
   return {
     id: row.id,
     ruleId: row.ruleId,
@@ -56,9 +62,9 @@ class PrismaRuleStore implements IRuleStore {
   }
 
   async findAll(filter?: RuleFilter): Promise<ComplianceRuleRecord[]> {
-    const where: any = {};
+    const where: Prisma.ComplianceRuleWhereInput = {};
     if (filter?.ruleId) where.ruleId = filter.ruleId;
-    if (filter?.source) where.source = filter.source;
+    if (filter?.source) where.source = filter.source as RuleSource;
     if (filter?.status) where.status = filter.status;
     if (filter?.caseType) {
       // appliesToCaseTypes is a JSON string; use string contains as a heuristic
@@ -73,7 +79,7 @@ class PrismaRuleStore implements IRuleStore {
   }
 
   async findEffective(caseType?: string): Promise<ComplianceRuleRecord[]> {
-    const where: any = { status: "EFFECTIVE" };
+    const where: Prisma.ComplianceRuleWhereInput = { status: "EFFECTIVE" };
     if (caseType) {
       where.appliesToCaseTypes = { contains: caseType };
     }
@@ -91,11 +97,11 @@ class PrismaRuleStore implements IRuleStore {
     const row = await prisma.complianceRule.create({
       data: {
         ruleId: data.ruleId,
-        source: data.source as any,
+        source: data.source as RuleSource,
         sourceReference: data.sourceReference,
         appliesToCaseTypes: data.appliesToCaseTypes,
         appliesToProgrammeTypes: data.appliesToProgrammeTypes,
-        severity: data.severity as any,
+        severity: data.severity as RuleSeverity,
         evaluation: data.evaluation,
         messageTemplate: data.messageTemplate,
         effectiveFrom: data.effectiveFrom,
@@ -110,11 +116,11 @@ class PrismaRuleStore implements IRuleStore {
   }
 
   async update(id: string, data: Partial<ComplianceRuleRecord>): Promise<ComplianceRuleRecord> {
-    const updateData: any = {};
+    const updateData: Prisma.ComplianceRuleUpdateInput = {};
     if (data.sourceReference !== undefined) updateData.sourceReference = data.sourceReference;
     if (data.appliesToCaseTypes !== undefined) updateData.appliesToCaseTypes = data.appliesToCaseTypes;
     if (data.appliesToProgrammeTypes !== undefined) updateData.appliesToProgrammeTypes = data.appliesToProgrammeTypes;
-    if (data.severity !== undefined) updateData.severity = data.severity;
+    if (data.severity !== undefined) updateData.severity = data.severity as RuleSeverity;
     if (data.evaluation !== undefined) updateData.evaluation = data.evaluation;
     if (data.messageTemplate !== undefined) updateData.messageTemplate = data.messageTemplate;
     if (data.effectiveFrom !== undefined) updateData.effectiveFrom = data.effectiveFrom;
