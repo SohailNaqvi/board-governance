@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   output: "standalone",
-  transpilePackages: ["@ums/domain", "@ums/source-data"],
+  transpilePackages: ["@ums/domain", "@ums/source-data", "@ums/compliance"],
   typescript: {
     ignoreBuildErrors: true,
   },

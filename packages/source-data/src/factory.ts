@@ -5,6 +5,8 @@ import type {
   IResolutionReader,
   IStudentAcademicReader,
   ISupervisorProfileReader,
+  IProgrammeProfileReader,
+  IRecognizedInstitutionReader,
 } from "./interfaces";
 import {
   MockHRDirectoryReader,
@@ -14,6 +16,8 @@ import {
   MockStudentAcademicReader,
   MockSupervisorProfileReader,
   MockASRBResolutionReader,
+  MockProgrammeProfileReader,
+  MockRecognizedInstitutionReader,
 } from "./mock-reader";
 import {
   WarehouseHRDirectoryReader,
@@ -22,6 +26,8 @@ import {
   WarehouseResolutionReader,
   WarehouseStudentAcademicReader,
   WarehouseSupervisorProfileReader,
+  WarehouseProgrammeProfileReader,
+  WarehouseRecognizedInstitutionReader,
 } from "./warehouse-reader";
 
 export type DataProviderType = "mock" | "warehouse";
@@ -34,6 +40,8 @@ export interface ReaderFactory {
   studentAcademic: IStudentAcademicReader;
   supervisorProfile: ISupervisorProfileReader;
   asrbResolution: IResolutionReader;
+  programmeProfile: IProgrammeProfileReader;
+  recognizedInstitution: IRecognizedInstitutionReader;
 }
 
 export function createReader(
@@ -49,6 +57,8 @@ export function createReader(
       studentAcademic: new MockStudentAcademicReader(),
       supervisorProfile: new MockSupervisorProfileReader(),
       asrbResolution: new MockASRBResolutionReader(),
+      programmeProfile: new MockProgrammeProfileReader(),
+      recognizedInstitution: new MockRecognizedInstitutionReader(),
     };
   }
 
@@ -64,6 +74,8 @@ export function createReader(
       studentAcademic: new WarehouseStudentAcademicReader(warehouseUrl),
       supervisorProfile: new WarehouseSupervisorProfileReader(warehouseUrl),
       asrbResolution: new WarehouseResolutionReader(warehouseUrl),
+      programmeProfile: new WarehouseProgrammeProfileReader(warehouseUrl),
+      recognizedInstitution: new WarehouseRecognizedInstitutionReader(warehouseUrl),
     };
   }
 

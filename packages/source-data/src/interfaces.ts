@@ -62,6 +62,12 @@ export interface StudentRecord {
   enrollmentDate: Date;
   status: string;
   supervisorEmpId?: string;
+  /** Whether required coursework has been completed */
+  courseworkCompleted: boolean;
+  /** Comprehensive exam status: NOT_TAKEN, PASSED, or FAILED */
+  comprehensiveExamStatus: "NOT_TAKEN" | "PASSED" | "FAILED";
+  /** Date the comprehensive exam was taken (null if NOT_TAKEN) */
+  comprehensiveExamDate: Date | null;
 }
 
 /** @deprecated Use IStudentAcademicReader instead. */
@@ -77,6 +83,13 @@ export interface IStudentAcademicReader {
   getActiveBySupervisor(supervisorEmpId: string): Promise<StudentRecord[]>;
 }
 
+export interface SupervisorPublication {
+  title: string;
+  journal: string;
+  year: number;
+  indexedIn: string[]; // e.g. ["HEC-W", "Scopus", "ISI"]
+}
+
 export interface SupervisorRecord {
   id: string;
   employeeId: string;
@@ -89,6 +102,8 @@ export interface SupervisorRecord {
   };
   activeSupervisionCount: number;
   maxSupervisionSlots: number;
+  /** Published research papers */
+  publications: SupervisorPublication[];
 }
 
 /** @deprecated Use ISupervisorProfileReader instead. */
@@ -102,4 +117,32 @@ export interface ISupervisorProfileReader {
   getByDepartment(department: string): Promise<SupervisorRecord[]>;
   getAvailableForSupervision(): Promise<SupervisorRecord[]>;
   getBySpecialization(specialization: string): Promise<SupervisorRecord[]>;
+}
+
+// ─── Programme Profile ──────────────────────────────────────────
+
+export interface ProgrammeRecord {
+  id: string;
+  code: string;
+  name: string;
+  type: string; // PhD, MPhil, MSc, etc.
+  department: string;
+  faculty: string;
+  minimumDuration: number; // months
+  maximumDuration: number; // months
+  requiredCredits: number;
+  /** Programme-specific parameters consumed by compliance rules (open map). */
+  ruleParameters: Record<string, unknown>;
+}
+
+export interface IProgrammeProfileReader {
+  getByCode(code: string): Promise<ProgrammeRecord | null>;
+  getByDepartment(department: string): Promise<ProgrammeRecord[]>;
+  getByType(type: string): Promise<ProgrammeRecord[]>;
+}
+
+// ─── Recognized Institution ─────────────────────────────────────
+
+export interface IRecognizedInstitutionReader {
+  isRecognized(name: string, country: string): Promise<boolean>;
 }

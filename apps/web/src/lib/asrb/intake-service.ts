@@ -24,7 +24,7 @@ interface UploadUrlInfo {
   expiresAt: string;
 }
 
-interface CaseSubmissionResult {
+export interface CaseSubmissionResult {
   caseId: string;
   status: string;
   receiptReference: string;
