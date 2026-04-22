@@ -13,6 +13,29 @@
 - Reference issue numbers when applicable
 - Keep commits focused and atomic
 
+## Continuous Integration
+
+Every pull request targeting `main` is checked by GitHub Actions (`.github/workflows/pr-checks.yml`). Three jobs run in parallel:
+
+| Check | Command | What it catches |
+|-------|---------|-----------------|
+| Typecheck | `pnpm -r typecheck` | Type errors across all 6 workspace packages |
+| Test | `pnpm exec vitest run` | Unit and contract test regressions (329 tests) |
+| Build | `cd apps/web && pnpm build` | Next.js webpack/module resolution failures |
+
+All three must pass before merging. Run them locally before pushing:
+
+```bash
+npx prisma generate --schema=prisma/schema.prisma   # if schema changed
+pnpm -r typecheck
+pnpm exec vitest run
+cd apps/web && pnpm build
+```
+
+Note: `prisma generate` is required after any change to `prisma/schema.prisma`. CI runs it automatically, but locally you must run it yourself or typecheck and build will fail with missing Prisma model errors.
+
+Lint (`pnpm lint`) is not yet enforced in CI due to 75 pre-existing errors in `apps/web`. A future PR will address the lint debt and add it as a fourth CI check.
+
 ## Testing
 
 All code changes should include tests:
@@ -45,6 +68,7 @@ All internal workspace packages **must** use the `@ums/*` scope. This is the can
 | Domain logic | `@ums/domain` |
 | Data abstraction | `@ums/source-data` |
 | Audit system | `@ums/audit` |
+| Compliance engine | `@ums/compliance` |
 | Web application | `@ums/web` |
 
 **Rules:**
