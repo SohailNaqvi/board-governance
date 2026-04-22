@@ -21,8 +21,8 @@ import type {
   IRuleStore,
   RuleFilter,
   ConflictInfo,
-} from "./types.js";
-import { validatePredicate } from "../predicate/validator.js";
+} from "./types"
+import { validatePredicate } from "../predicate/validator"
 
 export class CatalogServiceError extends Error {
   constructor(
