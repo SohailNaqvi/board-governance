@@ -3,7 +3,7 @@
  */
 
 import { randomUUID } from "crypto";
-import type { ComplianceRuleRecord, IRuleStore, RuleFilter } from "./types.js";
+import type { ComplianceRuleRecord, IRuleStore, RuleFilter } from "./types"
 
 export class MemoryRuleStore implements IRuleStore {
   private rules: ComplianceRuleRecord[] = [];

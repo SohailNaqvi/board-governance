@@ -26,8 +26,8 @@ import {
   isRef,
   isSafeFunction,
   getNodeType,
-} from "./grammar.js";
-import { getAttributeCatalog, type AttributeEntry } from "./attribute-catalog.js";
+} from "./grammar"
+import { getAttributeCatalog, type AttributeEntry } from "./attribute-catalog"
 
 export interface ValidationError {
   path: string;

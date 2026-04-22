@@ -21,10 +21,10 @@ import type {
   LowerFunction,
   UpperFunction,
   InstitutionRecognizedFunction,
-} from "./grammar.js";
-import { getNodeType, isRef, isSafeFunction } from "./grammar.js";
-import type { CaseContext } from "./case-context.js";
-import { resolveRef } from "./case-context.js";
+} from "./grammar"
+import { getNodeType, isRef, isSafeFunction } from "./grammar"
+import type { CaseContext } from "./case-context"
+import { resolveRef } from "./case-context"
 
 export class EvaluationError extends Error {
   constructor(
