@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ComplianceRuleRecord } from "@ums/compliance";
@@ -112,9 +112,19 @@ function FilterChips({
   );
 }
 
-// ─── Page component ──────────────────────────────────────────────
+// ─── Page export with Suspense boundary ──────────────────────────
 
 export default function RulesListPage() {
+  return (
+    <Suspense fallback={<RuleListSkeleton />}>
+      <RulesListContent />
+    </Suspense>
+  );
+}
+
+// ─── Inner component (uses useSearchParams) ──────────────────────
+
+function RulesListContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
