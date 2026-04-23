@@ -37,10 +37,10 @@ test.describe("Rule Detail Page", () => {
     await expect(metadata).toBeVisible();
 
     // Check key metadata fields are present
-    await expect(metadata.locator("text=Source")).toBeVisible();
-    await expect(metadata.locator("text=HEC")).toBeVisible();
-    await expect(metadata.locator("text=Version")).toBeVisible();
-    await expect(metadata.locator("text=RESULT_APPROVAL")).toBeVisible();
+    await expect(metadata.getByText("Source", { exact: true })).toBeVisible();
+    await expect(metadata.getByText("HEC", { exact: true })).toBeVisible();
+    await expect(metadata.getByText("Version", { exact: true })).toBeVisible();
+    await expect(metadata.getByText("RESULT_APPROVAL")).toBeVisible();
   });
 
   test("predicate pseudocode is present", async ({ page }) => {

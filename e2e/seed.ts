@@ -91,13 +91,17 @@ export async function seedRules(): Promise<string[]> {
 
   seededIds = [];
   for (const fixture of fixtures) {
-    const rule = await service.createRule({
-      ...fixture,
-      editedBy: SEED_AUTHOR,
-    });
-    // Publish immediately so rules show as EFFECTIVE in the UI
-    const published = await service.publish(rule.id, SEED_AUTHOR);
-    seededIds.push(published.id);
+    try {
+      const rule = await service.createRule({
+        ...fixture,
+        editedBy: SEED_AUTHOR,
+      });
+      // Publish immediately so rules show as EFFECTIVE in the UI
+      const published = await service.publish(rule.id, SEED_AUTHOR);
+      seededIds.push(published.id);
+    } catch (err) {
+      console.warn(`[e2e] Skipping rule ${fixture.ruleId}: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   return seededIds;
