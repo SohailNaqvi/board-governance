@@ -126,8 +126,10 @@ jobs:
       - name: Start server and run E2E tests
         run: |
           node apps/web/.next/standalone/apps/web/server.js &
-          npx wait-on http://localhost:3000 --timeout 30000
+          sleep 2
+          curl --retry 10 --retry-delay 2 --retry-connrefused -sf http://localhost:3000/api/health -o /dev/null
           PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test
         env:
+          HOSTNAME: 0.0.0.0
           PORT: 3000
           NODE_ENV: production
