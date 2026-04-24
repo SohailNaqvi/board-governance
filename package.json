@@ -13,6 +13,7 @@
     "test:contract": "turbo run test:contract",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "test:e2e": "npx playwright test",
     "db:migrate": "cd prisma && prisma migrate dev",
     "db:seed": "cd prisma && ts-node seed.ts",
     "db:push": "cd prisma && prisma db push",
@@ -22,11 +23,13 @@
     "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@prisma/client": "5.22.0",
     "@turbo/gen": "^1.12.4",
     "argon2": "0.41.1",
     "prisma": "5.22.0",
-    "turbo": "^1.12.4"
+    "turbo": "^1.12.4",
+    "wait-on": "^9.0.5"
   },
   "engines": {
     "node": ">=18.0.0",
