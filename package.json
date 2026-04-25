@@ -15,7 +15,7 @@
     "typecheck": "turbo run typecheck",
     "test:e2e": "npx playwright test",
     "db:migrate": "cd prisma && prisma migrate dev",
-    "db:seed": "cd prisma && ts-node seed.ts",
+    "db:seed": "cd prisma && ts-node seed.ts && cd .. && npx tsx prisma/seed-compliance-rules.ts",
     "db:push": "cd prisma && prisma db push",
     "db:studio": "cd prisma && prisma studio"
   },
@@ -28,6 +28,7 @@
     "@turbo/gen": "^1.12.4",
     "argon2": "0.41.1",
     "prisma": "5.22.0",
+    "tsx": "^4.21.0",
     "turbo": "^1.12.4",
     "wait-on": "^9.0.5"
   },
