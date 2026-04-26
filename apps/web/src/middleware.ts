@@ -46,6 +46,7 @@ export async function middleware(request: NextRequest) {
       );
     }
 
+    // Redirect to login page with returnUrl
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("returnUrl", pathname);
     return NextResponse.redirect(loginUrl);
@@ -62,6 +63,7 @@ export async function middleware(request: NextRequest) {
       );
     }
 
+    // Redirect to login page with returnUrl
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("returnUrl", pathname);
     return NextResponse.redirect(loginUrl);
