@@ -24,10 +24,30 @@ async function verifyToken(token: string): Promise<SessionPayload | null> {
   }
 }
 
+function loginRequiredPage(pathname: string): NextResponse {
+  const loginHref = `/login?returnUrl=${encodeURIComponent(pathname)}`;
+  return new NextResponse(
+    `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Login Required</title></head>
+<body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f9fafb">
+  <div style="text-align:center;max-width:400px;padding:2rem">
+    <h1 style="font-size:1.5rem;font-weight:700;color:#111827">Login required</h1>
+    <p style="margin:1rem 0;color:#6b7280">You must be logged in to access this page.</p>
+    <a href="${loginHref}" style="color:#2563eb;text-decoration:underline" data-testid="login-link">Go to login</a>
+  </div>
+</body>
+</html>`,
+    {
+      status: 401,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    }
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Match /admin/:path* and /api/admin/:path*
   const isAdminRoute = pathname.startsWith("/admin");
   const isAdminApiRoute = pathname.startsWith("/api/admin");
 
@@ -35,42 +55,26 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Get session cookie
+  // Read and verify session
   const sessionToken = request.cookies.get("session")?.value;
+  const session = sessionToken ? await verifyToken(sessionToken) : null;
 
-  if (!sessionToken) {
-    if (isAdminApiRoute) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    // Redirect to login page with returnUrl
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("returnUrl", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // Verify token
-  const session = await verifyToken(sessionToken);
-
+  // Unauthenticated
   if (!session) {
     if (isAdminApiRoute) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    // Redirect to login page with returnUrl
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("returnUrl", pathname);
-    return NextResponse.redirect(loginUrl);
+    return loginRequiredPage(pathname);
   }
 
-  // If user must change password and not already on change-password page
-  if (session.mustChangePassword && pathname !== "/change-password") {
+  // Must change password — redirect to /change-password unless already there
+  if (session.mustChangePassword && !pathname.startsWith("/change-password")) {
+    if (isAdminApiRoute) {
+      return NextResponse.json(
+        { error: "Password change required" },
+        { status: 403 }
+      );
+    }
     return NextResponse.redirect(new URL("/change-password", request.url));
   }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSession, verifyPassword } from "../../../../lib/auth/password";
+import { verifyPassword } from "../../../../lib/auth/password";
+import { createSession } from "../../../../lib/auth/session";
 import prisma from "../../../../lib/prisma";
 import logger from "../../../../lib/logger";
 
