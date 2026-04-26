@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifySession } from "../../../../lib/auth/session";
+import { verifySession, createSession } from "../../../../lib/auth/session";
 import { hashPassword, verifyPassword, validatePasswordStrength } from "../../../../lib/auth/password";
 import prisma from "../../../../lib/prisma";
 import logger from "../../../../lib/logger";
@@ -83,12 +83,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
+    // Issue a new session with mustChangePassword=false so middleware allows access
+    const newToken = await createSession({
+      userId: session.userId,
+      email: session.email,
+      name: session.name,
+      role: session.role,
+      mustChangePassword: false,
+    });
+
     logger.info({ userId: session.userId }, "User changed password successfully");
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       { success: true, message: "Password changed successfully" },
       { status: 200 }
     );
+
+    response.cookies.set("session", newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 8 * 60 * 60,
+    });
+
+    return response;
   } catch (error) {
     logger.error({ error }, "Change password error");
     return NextResponse.json(
