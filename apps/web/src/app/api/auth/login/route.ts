@@ -18,35 +18,42 @@ function getRateLimitKey(request: NextRequest): string {
   );
 }
 
-function isRateLimited(key: string): boolean {
+function checkRateLimit(key: string): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(key);
 
-  if (!entry) {
-    rateLimitMap.set(key, { count: 1, windowStart: now });
-    return false;
-  }
+  if (!entry) return false;
 
   // Reset window if expired
   if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
-    rateLimitMap.set(key, { count: 1, windowStart: now });
+    rateLimitMap.delete(key);
     return false;
   }
 
-  // Increment count and check limit
-  entry.count++;
-  if (entry.count > MAX_ATTEMPTS) {
-    return true;
+  return entry.count >= MAX_ATTEMPTS;
+}
+
+function recordFailedAttempt(key: string): void {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(key, { count: 1, windowStart: now });
+    return;
   }
 
-  return false;
+  entry.count++;
+}
+
+function clearFailedAttempts(key: string): void {
+  rateLimitMap.delete(key);
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const rateLimitKey = getRateLimitKey(request);
 
-    if (isRateLimited(rateLimitKey)) {
+    if (checkRateLimit(rateLimitKey)) {
       logger.warn({ ip: rateLimitKey }, "Login rate limit exceeded");
       return NextResponse.json(
         { error: "Too many login attempts. Please try again later." },
@@ -71,6 +78,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Generic error for security (don't reveal if user exists or password is wrong)
     if (!user || user.deactivatedAt) {
+      recordFailedAttempt(rateLimitKey);
       logger.warn({ email }, "Login attempt with invalid email or deactivated user");
       return NextResponse.json(
         { error: "Invalid email or password" },
@@ -80,7 +88,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Verify password
     if (!user.passwordHash) {
-      // User has no password set (shouldn't happen in normal flow)
+      recordFailedAttempt(rateLimitKey);
       logger.warn({ userId: user.id }, "Login attempt for user with no password");
       return NextResponse.json(
         { error: "Invalid email or password" },
@@ -91,12 +99,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const passwordValid = await verifyPassword(password, user.passwordHash);
 
     if (!passwordValid) {
+      recordFailedAttempt(rateLimitKey);
       logger.warn({ userId: user.id }, "Login attempt with wrong password");
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 }
       );
     }
+
+    // Successful login — clear failed attempt counter
+    clearFailedAttempts(rateLimitKey);
 
     // Create session including mustChangePassword flag
     const token = await createSession({
