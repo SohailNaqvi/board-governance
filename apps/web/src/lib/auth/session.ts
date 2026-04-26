@@ -1,5 +1,5 @@
 import { jwtVerify, SignJWT } from "jose";
-import type { UserRole } from "./seed-users";
+import type { UserRole } from "@prisma/client";
 
 const secret = new TextEncoder().encode(
   process.env.JWT_SECRET || "dev-secret-change-in-production"
@@ -10,11 +10,14 @@ export interface SessionPayload {
   email: string;
   name: string;
   role: UserRole;
+  mustChangePassword: boolean;
   iat?: number;
   exp?: number;
 }
 
-export async function createSession(payload: Omit<SessionPayload, "iat" | "exp">): Promise<string> {
+export async function createSession(
+  payload: Omit<SessionPayload, "iat" | "exp">
+): Promise<string> {
   const token = await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()

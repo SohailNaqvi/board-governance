@@ -1,23 +1,28 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { verifySession } from "@/lib/auth/session";
+import AdminHeader from "./admin-header";
 
 export const metadata: Metadata = {
   title: "Admin — University DSS",
 };
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get("session")?.value;
+  let session = null;
+
+  if (sessionToken) {
+    session = await verifySession(sessionToken);
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="mx-auto flex h-14 max-w-7xl items-center px-6">
-          <span className="text-sm font-semibold tracking-tight">
-            University DSS — Admin
-          </span>
-        </div>
-      </header>
+      <AdminHeader session={session} />
       <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
     </div>
   );
