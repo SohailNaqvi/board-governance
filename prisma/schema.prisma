@@ -666,3 +666,15 @@ model ASRBMember {
   @@index([roleType])
   @@index([active])
 }
+
+/// app_data table belongs to must-odoo-hr-tracker (MUST faculty reporting).
+/// This database is shared between projects. board-governance does NOT
+/// read or write this table. The model exists only so that prisma db push
+/// does not propose to drop the table.
+model app_data {
+  id         Int      @id @default(1)
+  data       Json
+  updated_at DateTime @default(now()) @db.Timestamp(6)
+
+  @@ignore
+}
