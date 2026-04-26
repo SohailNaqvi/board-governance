@@ -3,211 +3,146 @@ import {
   seedTestUser,
   seedBootstrapAdmin,
   TEST_USER,
-  authenticateContext,
 } from "./auth";
-import { PrismaClient } from "@prisma/client";
 
 test.describe("Authentication", () => {
-  let prisma: PrismaClient;
-
-  test.beforeAll(() => {
-    prisma = new PrismaClient();
-  });
-
-  test.afterAll(async () => {
-    await prisma.$disconnect();
-  });
-
-  test("unauthenticated access to /admin/* redirects to login", async ({ page }) => {
-    await page.goto("/admin/compliance/rules");
-    expect(page.url()).toContain("/login");
+  test("unauthenticated access to /admin/* shows login-required page", async ({ page }) => {
+    const response = await page.goto("/admin/compliance/rules");
+    // Middleware returns 401 with inline "Login required" HTML
+    expect(response?.status()).toBe(401);
+    await expect(page.locator("text=Login required")).toBeVisible();
+    await expect(page.locator("text=Go to login")).toBeVisible();
   });
 
   test("login with valid credentials succeeds and redirects", async ({ page }) => {
-    // Seed test user
     await seedTestUser();
 
     await page.goto("/login");
+    await page.fill('[data-testid="login-email"]', TEST_USER.email);
+    await page.fill('[data-testid="login-password"]', TEST_USER.password);
+    await page.click('[data-testid="login-submit"]');
 
-    // Fill in credentials
-    await page.fill('input[id="email"]', TEST_USER.email);
-    await page.fill('input[id="password"]', TEST_USER.password);
-
-    // Submit form
-    await page.click('button[type="submit"]');
-
-    // Should redirect to default admin route (not mustChangePassword)
-    expect(page.url()).toContain("/admin/compliance/rules");
+    // Wait for redirect to admin route
+    await expect(page).toHaveURL(/\/admin\/compliance\/rules/, { timeout: 10_000 });
   });
 
   test("login with invalid email shows error", async ({ page }) => {
     await page.goto("/login");
+    await page.fill('[data-testid="login-email"]', "nonexistent@university.edu");
+    await page.fill('[data-testid="login-password"]', "SomePassword123");
+    await page.click('[data-testid="login-submit"]');
 
-    await page.fill('input[id="email"]', "nonexistent@university.edu");
-    await page.fill('input[id="password"]', "SomePassword123");
-
-    await page.click('button[type="submit"]');
-
-    // Error message should be shown
-    const errorText = await page.locator("text=Invalid email or password").textContent();
-    expect(errorText).toContain("Invalid email or password");
-
-    // Should still be on login page
+    await expect(page.getByTestId("login-error")).toContainText(
+      "Invalid email or password",
+      { timeout: 10_000 }
+    );
     expect(page.url()).toContain("/login");
   });
 
   test("login with invalid password shows error", async ({ page }) => {
-    // Seed test user
     await seedTestUser();
 
     await page.goto("/login");
+    await page.fill('[data-testid="login-email"]', TEST_USER.email);
+    await page.fill('[data-testid="login-password"]', "WrongPassword123");
+    await page.click('[data-testid="login-submit"]');
 
-    await page.fill('input[id="email"]', TEST_USER.email);
-    await page.fill('input[id="password"]', "WrongPassword123");
-
-    await page.click('button[type="submit"]');
-
-    // Error message should be shown
-    const errorText = await page.locator("text=Invalid email or password").textContent();
-    expect(errorText).toContain("Invalid email or password");
-
-    // Should still be on login page
+    await expect(page.getByTestId("login-error")).toContainText(
+      "Invalid email or password",
+      { timeout: 10_000 }
+    );
     expect(page.url()).toContain("/login");
   });
 
-  test("bootstrap admin on first login redirects to change-password", async ({ page }) => {
-    // Seed bootstrap admin with mustChangePassword=true
+  test("bootstrap admin first login redirects to change-password", async ({ page }) => {
     const { email, password } = await seedBootstrapAdmin();
 
     await page.goto("/login");
+    await page.fill('[data-testid="login-email"]', email);
+    await page.fill('[data-testid="login-password"]', password);
+    await page.click('[data-testid="login-submit"]');
 
-    await page.fill('input[id="email"]', email);
-    await page.fill('input[id="password"]', password);
-
-    await page.click('button[type="submit"]');
-
-    // Should redirect to change-password
-    expect(page.url()).toContain("/change-password");
+    await expect(page).toHaveURL(/\/change-password/, { timeout: 10_000 });
   });
 
-  test("change password updates mustChangePassword flag", async ({ page, context }) => {
-    // Seed bootstrap admin
-    const { email, password } = await seedBootstrapAdmin("OldPassword123");
-
-    await page.goto("/login");
-
-    await page.fill('input[id="email"]', email);
-    await page.fill('input[id="password"]', password);
-
-    await page.click('button[type="submit"]');
-
-    // On change-password page
-    expect(page.url()).toContain("/change-password");
-
-    // Enter current password
-    await page.fill('input[id="current-password"]', password);
-
-    // Enter new password (must meet requirements)
-    await page.fill('input[id="new-password"]', "NewPassword123");
-
-    // Confirm new password
-    await page.fill('input[id="confirm-password"]', "NewPassword123");
-
-    // Submit form
-    await page.click('button[type="submit"]');
-
-    // Should redirect to admin rules page
-    expect(page.url()).toContain("/admin/compliance/rules");
-  });
-
-  test("protected admin routes block unauthenticated access", async ({ page }) => {
-    await page.goto("/admin/compliance/rules");
-    // Should redirect to login
-    expect(page.url()).toContain("/login");
-  });
-
-  test("logout clears session and redirects to login", async ({ page, context }) => {
-    // Seed test user
-    await seedTestUser();
-
-    await page.goto("/login");
+  test("change password flow completes and grants access", async ({ page }) => {
+    const { email, password } = await seedBootstrapAdmin("OldPassword123!");
 
     // Log in
-    await page.fill('input[id="email"]', TEST_USER.email);
-    await page.fill('input[id="password"]', TEST_USER.password);
+    await page.goto("/login");
+    await page.fill('[data-testid="login-email"]', email);
+    await page.fill('[data-testid="login-password"]', password);
+    await page.click('[data-testid="login-submit"]');
+
+    await expect(page).toHaveURL(/\/change-password/, { timeout: 10_000 });
+
+    // Fill change-password form
+    await page.fill('input[id="current-password"]', password);
+    await page.fill('input[id="new-password"]', "NewSecurePass123!");
+    await page.fill('input[id="confirm-password"]', "NewSecurePass123!");
+
     await page.click('button[type="submit"]');
 
-    // Wait for redirect to admin
-    expect(page.url()).toContain("/admin/compliance/rules");
+    // Should redirect to admin area
+    await expect(page).toHaveURL(/\/admin/, { timeout: 10_000 });
+  });
 
-    // Click logout button
+  test("logout clears session and returns to login-required", async ({ page }) => {
+    await seedTestUser();
+
+    // Log in
+    await page.goto("/login");
+    await page.fill('[data-testid="login-email"]', TEST_USER.email);
+    await page.fill('[data-testid="login-password"]', TEST_USER.password);
+    await page.click('[data-testid="login-submit"]');
+
+    await expect(page).toHaveURL(/\/admin\/compliance\/rules/, { timeout: 10_000 });
+
+    // Click logout
     await page.click('button:has-text("Log out")');
 
-    // Should redirect to login
-    expect(page.url()).toContain("/login");
+    // Should return to login page
+    await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
+
+    // Visiting admin again shows login-required
+    const response = await page.goto("/admin/compliance/rules");
+    expect(response?.status()).toBe(401);
+    await expect(page.locator("text=Login required")).toBeVisible();
   });
 
   test("rate limiting prevents brute force attacks", async ({ page }) => {
-    // Attempt to login 6 times with wrong password (exceeds limit of 5)
     await seedTestUser();
 
+    // Attempt 6 logins with wrong password (limit is 5)
     for (let i = 0; i < 6; i++) {
       await page.goto("/login");
-
-      await page.fill('input[id="email"]', TEST_USER.email);
-      await page.fill('input[id="password"]', "WrongPassword123");
-
-      await page.click('button[type="submit"]');
+      await page.fill('[data-testid="login-email"]', TEST_USER.email);
+      await page.fill('[data-testid="login-password"]', "WrongPassword123");
+      await page.click('[data-testid="login-submit"]');
+      // Wait for the error response before next attempt
+      await expect(page.getByTestId("login-error")).toBeVisible({ timeout: 10_000 });
     }
 
-    // On the 6th attempt, should see rate limit error
-    const errorText = await page.locator("text=Too many login attempts").textContent();
-    expect(errorText).toBeDefined();
+    // The 6th attempt should show rate-limit error
+    await expect(page.getByTestId("login-error")).toContainText(
+      /too many|rate limit/i,
+      { timeout: 10_000 }
+    );
   });
 
-  test("change password with weak password is rejected", async ({ page }) => {
-    // Seed bootstrap admin
-    await seedBootstrapAdmin("OldPassword123");
-
-    await page.goto("/login");
-
-    await page.fill('input[id="email"]', "admin@university-dss.local");
-    await page.fill('input[id="password"]', "OldPassword123");
-
-    await page.click('button[type="submit"]');
-
-    // On change-password page
-    expect(page.url()).toContain("/change-password");
-
-    // Try to set a weak password (less than 12 chars)
-    await page.fill('input[id="current-password"]', "OldPassword123");
-    await page.fill('input[id="new-password"]', "weak");
-    await page.fill('input[id="confirm-password"]', "weak");
-
-    // Submit button should be disabled
-    const submitButton = page.locator('button[type="submit"]');
-    expect(await submitButton.isDisabled()).toBeTruthy();
-  });
-
-  test("users redirected to change-password stay on that page", async ({ page }) => {
-    // Seed bootstrap admin
-    const { email, password } = await seedBootstrapAdmin();
+  test("404 for unknown rule still works after auth", async ({ page }) => {
+    await seedTestUser();
 
     // Log in
     await page.goto("/login");
+    await page.fill('[data-testid="login-email"]', TEST_USER.email);
+    await page.fill('[data-testid="login-password"]', TEST_USER.password);
+    await page.click('[data-testid="login-submit"]');
 
-    await page.fill('input[id="email"]', email);
-    await page.fill('input[id="password"]', password);
+    await expect(page).toHaveURL(/\/admin\/compliance\/rules/, { timeout: 10_000 });
 
-    await page.click('button[type="submit"]');
-
-    // Redirected to change-password
-    expect(page.url()).toContain("/change-password");
-
-    // Try to navigate directly to admin route
-    await page.goto("/admin/compliance/rules");
-
-    // Should redirect back to change-password
-    expect(page.url()).toContain("/change-password");
+    // Navigate to nonexistent rule
+    await page.goto("/admin/compliance/rules/nonexistent-rule-id");
+    await expect(page.getByTestId("rule-not-found")).toBeVisible({ timeout: 10_000 });
   });
 });

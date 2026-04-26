@@ -4,6 +4,7 @@ const nextConfig = {
   swcMinify: true,
   output: "standalone",
   transpilePackages: ["@ums/domain", "@ums/source-data", "@ums/compliance"],
+  serverExternalPackages: ["argon2"],
   typescript: {
     ignoreBuildErrors: true,
   },
