@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+/* Design tokens from DSS_Cockpit_Demo_1.html — scoped to /dss routes only */
+.dss-root {
+  --ink: #0A1F44;
+  --ink-2: #050E24;
+  --bg: #F6F4EE;
+  --panel: #FFFFFF;
+  --line: #E4DFD2;
+  --line-strong: #C9C1AB;
+  --muted: #6A6557;
+  --amber: #C08020;
+  --amber-bg: #F5E9D0;
+  --teal: #0A6B6B;
+  --teal-bg: #DDEBEA;
+  --rose: #8C2F2F;
+  --rose-bg: #F3DDDD;
+  --sage: #4A6B3A;
+  --sage-bg: #E0E9D3;
+
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.45;
+}
