@@ -15,13 +15,65 @@
  *   - If the update fails, the password is NOT printed.
  *   - If the user already has a passwordHash, the script refuses to overwrite.
  *
+ * Self-contained: all dependencies are inlined (no cross-package imports)
+ * to ensure the script runs on Render Shell without app build artifacts.
+ *
  * Requires: DATABASE_URL in environment, prisma generate already run.
  */
 
 import { PrismaClient } from "@prisma/client";
-import { hashPassword, generateSecurePassword } from "../apps/web/src/lib/auth/password";
+import * as argon2 from "argon2";
 
 const DEFAULT_EMAIL = "sysadmin@university.edu";
+
+/**
+ * Argon2id configuration matching OWASP 2024 recommendations.
+ * Same params as bootstrap-admin.ts and apps/web/src/lib/auth/password.ts.
+ */
+const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
+  type: argon2.argon2id,
+  memoryCost: 19456, // ~19 MB
+  timeCost: 2,
+  parallelism: 1,
+};
+
+async function hashPassword(plaintext: string): Promise<string> {
+  return argon2.hash(plaintext, ARGON2_OPTIONS);
+}
+
+/**
+ * Generate a secure random password.
+ * 20 characters: mix of upper, lower, digits, and symbols.
+ */
+function generateSecurePassword(length: number = 20): string {
+  const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lowercase = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const symbols = "!@#$%^&*()-_=+[]{}|;:,.<>?";
+
+  const all = uppercase + lowercase + digits + symbols;
+
+  // Ensure at least one char of each type
+  const chars = [
+    uppercase[Math.floor(Math.random() * uppercase.length)],
+    lowercase[Math.floor(Math.random() * lowercase.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    symbols[Math.floor(Math.random() * symbols.length)],
+  ];
+
+  // Fill the rest randomly
+  for (let i = chars.length; i < length; i++) {
+    chars.push(all[Math.floor(Math.random() * all.length)]);
+  }
+
+  // Shuffle using Fisher-Yates
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join("");
+}
 
 async function main() {
   const targetEmail = process.argv[2] ?? DEFAULT_EMAIL;
