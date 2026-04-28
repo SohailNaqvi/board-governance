@@ -5,7 +5,7 @@ interface SectionPlaceholderProps {
   description: string;
 }
 
-export default function SectionPlaceholder({
+export function SectionPlaceholder({
   sectionName,
   description,
 }: SectionPlaceholderProps) {
