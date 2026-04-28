@@ -50,8 +50,10 @@ export async function middleware(request: NextRequest) {
 
   const isAdminRoute = pathname.startsWith("/admin");
   const isAdminApiRoute = pathname.startsWith("/api/admin");
+  const isDssRoute = pathname.startsWith("/dss");
+  const isDssApiRoute = pathname.startsWith("/api/dss");
 
-  if (!isAdminRoute && !isAdminApiRoute) {
+  if (!isAdminRoute && !isAdminApiRoute && !isDssRoute && !isDssApiRoute) {
     return NextResponse.next();
   }
 
@@ -61,7 +63,7 @@ export async function middleware(request: NextRequest) {
 
   // Unauthenticated
   if (!session) {
-    if (isAdminApiRoute) {
+    if (isAdminApiRoute || isDssApiRoute) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     return loginRequiredPage(pathname);
@@ -69,7 +71,7 @@ export async function middleware(request: NextRequest) {
 
   // Must change password — redirect to /change-password unless already there
   if (session.mustChangePassword && !pathname.startsWith("/change-password")) {
-    if (isAdminApiRoute) {
+    if (isAdminApiRoute || isDssApiRoute) {
       return NextResponse.json(
         { error: "Password change required" },
         { status: 403 }
@@ -82,5 +84,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*", "/dss/:path*", "/api/dss/:path*"],
 };
