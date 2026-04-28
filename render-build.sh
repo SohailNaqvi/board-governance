@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 set -e
 
+# ─────────────────────────────────────────────────────────────────
+# render-build.sh — Render deploy build script
+#
+# Cleaned up in Slice Deploy-1 (PR #17, April 2026).
+#
+# The following one-time migration and seed scripts were removed from
+# this build because they have already run successfully against the
+# production database. They remain in prisma/ as historical record:
+#
+#   - migrate-slice2.mjs              (Slice 2 schema: MeetingCalendar cols, APCEEvent, InAppNotification)
+#   - migrate-asrb-slice2.mjs         (ASRB Slice 2: FeederClient, ASRBCase, CaseAttachment, CaseAuditEvent)
+#   - migrate-asrb-slice1-completion.mjs (ASRB Slice 1: ComplianceRule, ComplianceEvaluation, RuleEvaluation)
+#   - seed-asrb-cases.mjs             (20 ASRB case fixtures)
+#   - migrate-remediation-slice3-prereqs.mjs (Slice 3 prereqs: ASRBMeeting, ASRBMember, ASRB UserRole values)
+#   - seed-remediation-slice3-prereqs.mjs    (2 meetings, 6 members, 7 ASRB users)
+#   - migrate-argon2id-api-keys.mjs   (API key hash migration to argon2id)
+#
+# Going forward, schema changes use "npx prisma db push" via Render Shell
+# (manual, deliberate, observed). Seed scripts run via Render Shell once.
+# See docs/deployment.md for the full workflow.
+# ─────────────────────────────────────────────────────────────────
+
 echo "=== Installing pnpm ==="
 npm install -g pnpm@9
 
@@ -19,29 +41,6 @@ npx prisma@5.22.0 generate --schema=../../prisma/schema.prisma
 cd ../..
 mv pnpm-lock.yaml.bak pnpm-lock.yaml
 mv pnpm-workspace.yaml.bak pnpm-workspace.yaml
-
-echo "=== Running Slice 2 DB migration ==="
-# pg is in root dependencies, installed by pnpm install above
-node prisma/migrate-slice2.mjs
-
-echo "=== Running ASRB Slice 2 DB migration ==="
-# ASRB tables and feeder clients
-node prisma/migrate-asrb-slice2.mjs
-
-echo "=== Running ASRB Slice 1 completion migration ==="
-node prisma/migrate-asrb-slice1-completion.mjs
-
-echo "=== Seeding ASRB cases ==="
-node prisma/seed-asrb-cases.mjs
-
-echo "=== Running Slice 3 prerequisites migration ==="
-node prisma/migrate-remediation-slice3-prereqs.mjs
-
-echo "=== Seeding Slice 3 prerequisites ==="
-node prisma/seed-remediation-slice3-prereqs.mjs
-
-echo "=== Migrating API key hashes to argon2id ==="
-node prisma/migrate-argon2id-api-keys.mjs
 
 echo "=== Building Next.js ==="
 cd apps/web
