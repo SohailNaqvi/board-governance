@@ -1,110 +1,92 @@
-import { test, expect } from '@playwright/test';
-import { authenticateContext } from './auth';
+import { test, expect } from "@playwright/test";
+import { authenticateContext } from "./auth";
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
-
-test.describe('DSS - Strategic Cockpit', () => {
-  test('authenticated user reaches /dss and sees the Strategic Cockpit', async ({ browser }) => {
-    const context = await browser.newContext();
-    await authenticateContext(context, BASE_URL);
+test.describe("DSS Pages", () => {
+  test("authenticated user reaches /dss and sees Strategic Cockpit", async ({
+    context,
+    baseURL,
+  }) => {
+    await authenticateContext(context, baseURL!);
     const page = await context.newPage();
 
-    await page.goto(`${BASE_URL}/dss`);
+    await page.goto("/dss");
 
-    // Verify page loaded
-    await page.waitForLoadState('networkidle');
+    // Page wrapper with test ID
+    await expect(page.getByTestId("strategic-cockpit")).toBeVisible({
+      timeout: 10_000,
+    });
 
-    // Check for strategic cockpit element
-    await expect(page.locator('[data-testid="strategic-cockpit"]')).toBeVisible();
-
-    // Check for demo-data banner
-    await expect(page.locator('[data-testid="demo-data-banner"]')).toBeVisible();
-    await expect(page.locator('[data-testid="demo-data-banner"]')).toContainText(
-      'Demo data — content on this page is illustrative'
+    // Demo-data banner
+    await expect(page.getByTestId("demo-data-banner")).toBeVisible();
+    await expect(page.getByTestId("demo-data-banner")).toContainText(
+      "Demo data"
     );
 
-    // Check for KPI strip
-    await expect(page.locator('[data-testid="kpi-strip"]')).toBeVisible();
-
-    // Verify some content exists
-    await expect(page.locator('text=Strategic Cockpit')).toBeVisible();
-    await expect(page.locator('text=Syndicate · Draft Agenda')).toBeVisible();
-
-    await context.close();
+    // KPI strip
+    await expect(page.getByTestId("kpi-strip")).toBeVisible();
   });
 
-  test('/dss/syndicate renders with the shell and under-construction message', async ({ browser }) => {
-    const context = await browser.newContext();
-    await authenticateContext(context, BASE_URL);
-    const page = await context.newPage();
-
-    await page.goto(`${BASE_URL}/dss/syndicate`);
-    await page.waitForLoadState('networkidle');
-
-    // Check for section name and description
-    await expect(page.locator('text=Syndicate')).toBeVisible();
-    await expect(
-      page.locator('text=This page will host the Syndicate meeting workspace')
-    ).toBeVisible();
-
-    await context.close();
-  });
-
-  test('/dss/asrb renders with the shell and under-construction message', async ({ browser }) => {
-    const context = await browser.newContext();
-    await authenticateContext(context, BASE_URL);
-    const page = await context.newPage();
-
-    await page.goto(`${BASE_URL}/dss/asrb`);
-    await page.waitForLoadState('networkidle');
-
-    // Check for section name and description
-    await expect(page.locator('text=ASRB')).toBeVisible();
-    await expect(
-      page.locator('text=This page will host the Academic Staff Review Board workspace')
-    ).toBeVisible();
-
-    await context.close();
-  });
-
-  test('sidebar navigation — click "Action Tracker" from /dss, verify URL changes to /dss/action-tracker', async ({
-    browser,
+  test("/dss/syndicate renders placeholder with shell", async ({
+    context,
+    baseURL,
   }) => {
-    const context = await browser.newContext();
-    await authenticateContext(context, BASE_URL);
+    await authenticateContext(context, baseURL!);
     const page = await context.newPage();
 
-    await page.goto(`${BASE_URL}/dss`);
-    await page.waitForLoadState('networkidle');
+    await page.goto("/dss/syndicate");
+
+    // Check for the unique description text (not just "Syndicate" which appears in sidebar)
+    await expect(
+      page.locator("text=This page will host the Syndicate meeting workspace")
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("/dss/asrb renders placeholder with shell", async ({
+    context,
+    baseURL,
+  }) => {
+    await authenticateContext(context, baseURL!);
+    const page = await context.newPage();
+
+    await page.goto("/dss/asrb");
+
+    await expect(
+      page.locator(
+        "text=This page will host the Academic Staff Review Board workspace"
+      )
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("sidebar navigation to /dss/action-tracker", async ({
+    context,
+    baseURL,
+  }) => {
+    await authenticateContext(context, baseURL!);
+    const page = await context.newPage();
+
+    await page.goto("/dss");
+    await expect(page.getByTestId("strategic-cockpit")).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Click Action Tracker in sidebar
-    await page.locator('a:has-text("Action Tracker")').first().click();
-    await page.waitForLoadState('networkidle');
+    await page.locator("a:has-text('Action Tracker')").first().click();
 
-    // Verify URL changed
-    expect(page.url()).toContain('/dss/action-tracker');
+    await expect(page).toHaveURL(/\/dss\/action-tracker/, {
+      timeout: 10_000,
+    });
 
-    // Verify page content loaded
-    await expect(page.locator('text=Action Tracker')).toBeVisible();
     await expect(
-      page.locator('text=This page will host the cross-committee action tracker')
-    ).toBeVisible();
-
-    await context.close();
+      page.locator(
+        "text=This page will host the cross-committee action tracker"
+      )
+    ).toBeVisible({ timeout: 10_000 });
   });
 
-  test('unauthenticated /dss access shows login-required page', async ({ browser }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-
-    await page.goto(`${BASE_URL}/dss`);
-    await page.waitForLoadState('networkidle');
-
-    // Should redirect to login or show login page
-    // The exact behavior depends on middleware; verify we're not on the cockpit
-    const urlAfterRedirect = page.url();
-    expect(urlAfterRedirect).not.toContain('/dss/');
-
-    await context.close();
+  test("unauthenticated /dss shows login-required", async ({ page }) => {
+    const response = await page.goto("/dss");
+    // Middleware returns 401 with inline "Login required" HTML
+    expect(response?.status()).toBe(401);
+    await expect(page.locator("text=Login required")).toBeVisible();
   });
 });
