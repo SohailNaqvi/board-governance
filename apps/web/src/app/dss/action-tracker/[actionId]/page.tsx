@@ -125,16 +125,7 @@ export default async function ActionDetailPage({ params }: PageProps) {
       </p>
 
       {/* Card 1: Overview */}
-      <Card>
-        <h2
-          style={{
-            fontSize: "16px",
-            fontFamily: "Fraunces, serif",
-            margin: "0 0 16px 0",
-          }}
-        >
-          Action Overview
-        </h2>
+      <Card title="Action Overview">
 
         <div
           style={{
@@ -158,7 +149,7 @@ export default async function ActionDetailPage({ params }: PageProps) {
               >
                 Category
               </label>
-              <Tag label={action.category} />
+              <Tag label={action.category} variant="teal" />
             </div>
 
             <div style={{ marginBottom: "16px" }}>
@@ -270,16 +261,7 @@ export default async function ActionDetailPage({ params }: PageProps) {
       </Card>
 
       {/* Card 2: Timeline */}
-      <Card>
-        <h2
-          style={{
-            fontSize: "16px",
-            fontFamily: "Fraunces, serif",
-            margin: "0 0 16px 0",
-          }}
-        >
-          Timeline
-        </h2>
+      <Card title="Timeline">
 
         <div
           style={{
@@ -349,17 +331,7 @@ export default async function ActionDetailPage({ params }: PageProps) {
 
       {/* Card 3: Related Actions (only if there are any) */}
       {related.length > 0 && (
-        <Card>
-          <h2
-            style={{
-              fontSize: "16px",
-              fontFamily: "Fraunces, serif",
-              margin: "0 0 16px 0",
-            }}
-          >
-            Related Actions from "{action.sourceMeeting}"
-          </h2>
-
+        <Card title={`Related Actions from "${action.sourceMeeting}"`}>
           <ul style={{ listStyle: "none", padding: "0", margin: "0" }}>
             {related.map((r) => (
               <li

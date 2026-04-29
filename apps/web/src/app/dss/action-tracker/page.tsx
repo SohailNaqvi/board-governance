@@ -251,6 +251,7 @@ function ActionTrackerListContent() {
         <AlertBanner
           title={`${stats.overdue} action${stats.overdue !== 1 ? "s" : ""} overdue`}
           subtitle="Review with owners to get back on track"
+          ctaLabel="View overdue"
         />
       )}
 
@@ -454,7 +455,7 @@ function ActionTrackerListContent() {
                   </Link>
                 </td>
                 <td style={{ padding: "8px" }}>
-                  <Tag label={`${action.ownerName}/${action.ownerUnit}`} />
+                  <Tag label={`${action.ownerName}/${action.ownerUnit}`} variant="teal" />
                 </td>
                 <td style={{ padding: "8px" }}>
                   {formatDate(action.dueDate)}
