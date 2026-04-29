@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 interface DssTopbarProps {
   userName: string;
   userEmail: string;
@@ -54,8 +56,20 @@ export default function DssTopbar({ userName, userEmail }: DssTopbarProps) {
         }}
       />
 
-      {/* Context (spacer for now) */}
-      <div style={{ flex: 1 }} />
+      {/* Context + prototype link */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+        <Link
+          href="/dss-prototype"
+          style={{
+            fontSize: '11px',
+            color: 'var(--muted)',
+            textDecoration: 'none',
+            letterSpacing: '0.02em',
+          }}
+        >
+          View prototype →
+        </Link>
+      </div>
 
       {/* Status indicator */}
       <div
