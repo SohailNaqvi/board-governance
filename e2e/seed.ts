@@ -230,3 +230,79 @@ export async function teardownAll(): Promise<void> {
     prisma = null;
   }
 }
+
+/**
+ * Seed board action items for testing list/detail pages.
+ */
+let seededActionIds: string[] = [];
+
+export async function seedBoardActions(): Promise<string[]> {
+  if (!prisma) prisma = new PrismaClient();
+
+  try {
+    const actions = [
+      {
+        actionRef: "E2E-TEST-BAI-001",
+        description: "Test action item 1 for E2E",
+        sourceMeeting: "E2E Test Meeting Q1",
+        category: "GOVERNANCE" as const,
+        ownerName: "Test Owner 1",
+        ownerUnit: "TEST",
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        status: "OPEN" as const,
+        progressPercent: 0,
+      },
+      {
+        actionRef: "E2E-TEST-BAI-002",
+        description: "Test action item 2 for E2E",
+        sourceMeeting: "E2E Test Meeting Q1",
+        category: "STRATEGIC" as const,
+        ownerName: "Test Owner 2",
+        ownerUnit: "TEST",
+        dueDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10 days ago
+        status: "OVERDUE" as const,
+        progressPercent: 25,
+      },
+      {
+        actionRef: "E2E-TEST-BAI-003",
+        description: "Test action item 3 for E2E",
+        sourceMeeting: "E2E Test Meeting Q2",
+        category: "ACADEMIC" as const,
+        ownerName: "Test Owner 3",
+        ownerUnit: "TEST",
+        dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days from now
+        status: "IN_PROGRESS" as const,
+        progressPercent: 50,
+      },
+    ];
+
+    seededActionIds = [];
+    for (const action of actions) {
+      const created = await prisma.boardActionItem.upsert({
+        where: { actionRef: action.actionRef },
+        update: action,
+        create: action,
+      });
+      seededActionIds.push(created.id);
+    }
+
+    return seededActionIds;
+  } finally {
+    // Note: Don't disconnect here; it's done in teardownAll
+  }
+}
+
+export async function teardownBoardActions(): Promise<void> {
+  if (!prisma) return;
+
+  // Delete only actions created by this seed run
+  if (seededActionIds.length > 0) {
+    await prisma.boardActionItem.deleteMany({
+      where: {
+        actionRef: { startsWith: "E2E-TEST-BAI-" },
+      },
+    });
+  }
+
+  seededActionIds = [];
+}

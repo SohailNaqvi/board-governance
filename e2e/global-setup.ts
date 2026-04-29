@@ -1,8 +1,8 @@
 /**
- * Playwright global setup — seeds compliance rules and ASRB cases before all tests.
+ * Playwright global setup — seeds compliance rules, ASRB cases, and board actions before all tests.
  */
 
-import { seedRules, seedAsrbCases } from "./seed";
+import { seedRules, seedAsrbCases, seedBoardActions } from "./seed";
 
 export default async function globalSetup() {
   console.log("[e2e] Seeding compliance rules...");
@@ -13,7 +13,12 @@ export default async function globalSetup() {
   const caseIds = await seedAsrbCases();
   console.log(`[e2e] Seeded ${caseIds.length} ASRB cases.`);
 
+  console.log("[e2e] Seeding board action items...");
+  const actionIds = await seedBoardActions();
+  console.log(`[e2e] Seeded ${actionIds.length} board action items.`);
+
   // Store IDs for teardown
   process.env.E2E_SEEDED_RULE_IDS = JSON.stringify(ruleIds);
   process.env.E2E_SEEDED_CASE_IDS = JSON.stringify(caseIds);
+  process.env.E2E_SEEDED_ACTION_IDS = JSON.stringify(actionIds);
 }
