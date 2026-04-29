@@ -138,12 +138,11 @@ test.describe("ASRB Cases", () => {
     // Wait for detail page
     await expect(page.getByTestId("case-detail")).toBeVisible({ timeout: 10_000 });
 
-    // Check for key sections
+    // Check for key sections (use getByText with exact to avoid strict mode violations)
     await expect(page.locator("h1")).toBeVisible();
-    await expect(page.locator("text=Case Overview")).toBeVisible();
-    await expect(page.locator("text=Compliance Evaluations")).toBeVisible();
-    await expect(page.locator("text=Audit Trail")).toBeVisible();
-    await expect(page.locator("text=Attachments")).toBeVisible();
+    await expect(page.getByText("Case Overview", { exact: true })).toBeVisible();
+    await expect(page.getByText("Audit Trail", { exact: true })).toBeVisible();
+    await expect(page.getByText("Attachments", { exact: true })).toBeVisible();
   });
 
   test("detail page has back link to list", async ({ page }) => {
