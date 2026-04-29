@@ -41,7 +41,7 @@ test.describe("DSS Pages", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("/dss/asrb renders placeholder with shell", async ({
+  test("/dss/asrb renders cases list (no longer placeholder)", async ({
     context,
     baseURL,
   }) => {
@@ -50,10 +50,9 @@ test.describe("DSS Pages", () => {
 
     await page.goto("/dss/asrb");
 
+    // ASRB is now a real cases list, not a placeholder
     await expect(
-      page.locator(
-        "text=This page will host the Academic Staff Review Board workspace"
-      )
+      page.getByText("ASRB Cases", { exact: true })
     ).toBeVisible({ timeout: 10_000 });
   });
 
