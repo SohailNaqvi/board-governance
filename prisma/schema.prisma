@@ -678,3 +678,41 @@ model app_data {
 
   @@ignore
 }
+
+// ============ Board Action Items ============
+
+enum BoardActionCategory {
+  GOVERNANCE
+  STRATEGIC
+  FINANCIAL
+  ACADEMIC
+  COMPLIANCE
+}
+
+enum BoardActionStatus {
+  OPEN
+  IN_PROGRESS
+  AT_RISK
+  OVERDUE
+  COMPLETED
+  CLOSED
+}
+
+model BoardActionItem {
+  id              String              @id @default(cuid())
+  actionRef       String              @unique
+  description     String
+  sourceMeeting   String
+  category        BoardActionCategory
+  ownerName       String
+  ownerUnit       String
+  dueDate         DateTime
+  status          BoardActionStatus
+  progressPercent Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([status])
+  @@index([category])
+  @@index([dueDate])
+}
