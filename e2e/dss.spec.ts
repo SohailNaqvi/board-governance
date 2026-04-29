@@ -75,11 +75,10 @@ test.describe("DSS Pages", () => {
       timeout: 10_000,
     });
 
-    await expect(
-      page.locator(
-        "text=This page will host the cross-committee action tracker"
-      )
-    ).toBeVisible({ timeout: 10_000 });
+    // Page is now a real list page, not a placeholder
+    await expect(page.getByTestId("action-tracker-list")).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test("unauthenticated /dss shows login-required", async ({ page }) => {
