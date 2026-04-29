@@ -1,22 +1,23 @@
 /**
- * Playwright global teardown — removes seeded compliance rules.
- *
- * Runs in a separate process from global-setup, so we can't share in-memory
- * state. Instead, we clean up by the SEED_AUTHOR marker.
+ * Playwright global teardown — cleans up seeded data.
  */
 
-import { PrismaClient } from "@prisma/client";
-
-const SEED_AUTHOR = "e2e-seed@playwright.test";
+import { teardownRules, teardownAsrbCases, teardownAll } from "./seed";
 
 export default async function globalTeardown() {
-  const prisma = new PrismaClient();
   try {
-    const result = await prisma.complianceRule.deleteMany({
-      where: { lastEditedBy: SEED_AUTHOR },
-    });
-    console.log(`[e2e] Teardown: removed ${result.count} seeded rules.`);
-  } finally {
-    await prisma.$disconnect();
+    console.log("[e2e] Cleaning up seeded rules...");
+    await teardownRules();
+    console.log("[e2e] Cleaned up rules.");
+
+    console.log("[e2e] Cleaning up seeded ASRB cases...");
+    await teardownAsrbCases();
+    console.log("[e2e] Cleaned up ASRB cases.");
+
+    console.log("[e2e] Disconnecting Prisma...");
+    await teardownAll();
+    console.log("[e2e] Done.");
+  } catch (err) {
+    console.error("[e2e] Teardown error:", err);
   }
 }

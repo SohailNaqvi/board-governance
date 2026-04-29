@@ -1,12 +1,10 @@
 /**
- * Playwright E2E seed — inserts compliance rules via CatalogService.
- *
- * Constraint: uses the public CatalogService API (not raw Prisma) so that
- * validation, versioning, and conflict detection are preserved.
+ * Playwright E2E seed — inserts compliance rules via CatalogService
+ * and ASRB cases for testing list/detail pages.
  *
  * Isolation: operates on whichever DATABASE_URL is set in the environment.
  * CI points this at a throwaway Postgres service container.
- * The teardown function removes only the rules this script inserted.
+ * The teardown functions remove only what this script inserted.
  */
 
 import { CatalogService } from "../packages/compliance/src/catalog/catalog-service";
@@ -81,7 +79,8 @@ function loadFixtures(): SeedRule[] {
 const SEED_AUTHOR = "e2e-seed@playwright.test";
 
 let prisma: PrismaClient | null = null;
-let seededIds: string[] = [];
+let seededRuleIds: string[] = [];
+let seededCaseIds: string[] = [];
 
 export async function seedRules(): Promise<string[]> {
   prisma = new PrismaClient();
@@ -89,7 +88,7 @@ export async function seedRules(): Promise<string[]> {
   const service = new CatalogService(store);
   const fixtures = loadFixtures();
 
-  seededIds = [];
+  seededRuleIds = [];
   for (const fixture of fixtures) {
     try {
       const rule = await service.createRule({
@@ -98,13 +97,96 @@ export async function seedRules(): Promise<string[]> {
       });
       // Publish immediately so rules show as EFFECTIVE in the UI
       const published = await service.publish(rule.id, SEED_AUTHOR);
-      seededIds.push(published.id);
+      seededRuleIds.push(published.id);
     } catch (err) {
       console.warn(`[e2e] Skipping rule ${fixture.ruleId}: ${err instanceof Error ? err.message : err}`);
     }
   }
 
-  return seededIds;
+  return seededRuleIds;
+}
+
+/**
+ * Seed ASRB cases for testing list/detail pages.
+ * Creates a feeder client first, then 20 test cases with various statuses.
+ */
+export async function seedAsrbCases(): Promise<string[]> {
+  if (!prisma) prisma = new PrismaClient();
+
+  try {
+    // Create or get a feeder client
+    const feederClient = await prisma.feederClient.upsert({
+      where: { feederBodyCode: "E2E_TEST_DGSC" },
+      update: {},
+      create: {
+        displayName: "E2E Test DGSC",
+        feederBodyType: "DGSC",
+        feederBodyCode: "E2E_TEST_DGSC",
+        apiKeyHash: "fake-hash-for-e2e",
+        permittedCaseTypes: JSON.stringify([
+          "SYNOPSIS_APPROVAL",
+          "EXAMINER_APPOINTMENT",
+          "RESULT_APPROVAL",
+          "SUPERVISOR_CHANGE",
+        ]),
+      },
+    });
+
+    // Create test cases with different statuses and types
+    const statuses = [
+      "RECEIVED",
+      "COMPLIANCE_EVALUATED",
+      "VETTING",
+      "READY_FOR_AGENDA",
+      "ON_AGENDA",
+      "DECIDED",
+      "CLOSED",
+      "RETURNED",
+      "HELD",
+      "WITHDRAWN",
+      "URGENT_CIRCULATION",
+      "DEFERRED",
+    ];
+
+    const caseTypes = ["SYNOPSIS_APPROVAL", "EXAMINER_APPOINTMENT", "RESULT_APPROVAL", "SUPERVISOR_CHANGE"];
+
+    const cases = [];
+
+    for (let i = 0; i < 20; i++) {
+      const status = statuses[i % statuses.length];
+      const caseType = caseTypes[i % caseTypes.length];
+      const urgency = i % 5 === 0 ? "URGENT_CIRCULATION" : "NORMAL";
+
+      const caseRecord = await prisma.aSRBCase.create({
+        data: {
+          receiptReference: `E2E-TEST-${String(i + 1).padStart(5, "0")}`,
+          idempotencyKey: `e2e-idempotency-${i}`,
+          feederClientId: feederClient.id,
+          feederBodyType: "DGSC",
+          feederBodyCode: "E2E_TEST_DGSC",
+          caseType: caseType as any,
+          status: status as any,
+          urgency: urgency as any,
+          studentRegNo: `STU${String(100000 + i).slice(-5)}`,
+          supervisorEmpId: `SUP${String(200000 + i).slice(-5)}`,
+          programmeCode: `PROG-${["PhD", "MSc", "MEng"][i % 3]}`,
+          casePayload: JSON.stringify({
+            thesis_title: `Test Thesis ${i + 1}: Research on Computational Systems`,
+            keywords: ["testing", "e2e", "asrb"],
+            similarity_index: Math.random() * 30,
+            submission_date: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
+          }),
+        },
+      });
+
+      cases.push(caseRecord.id);
+    }
+
+    seededCaseIds = cases;
+    return cases;
+  } finally {
+    // Note: Don't disconnect here; it's done in teardownAll
+  }
 }
 
 export async function teardownRules(): Promise<void> {
@@ -115,7 +197,36 @@ export async function teardownRules(): Promise<void> {
     where: { lastEditedBy: SEED_AUTHOR },
   });
 
-  await prisma.$disconnect();
-  prisma = null;
-  seededIds = [];
+  seededRuleIds = [];
+}
+
+/**
+ * Tear down ASRB cases and feeder client.
+ */
+export async function teardownAsrbCases(): Promise<void> {
+  if (!prisma) return;
+
+  // Delete cases
+  if (seededCaseIds.length > 0) {
+    await prisma.aSRBCase.deleteMany({
+      where: { id: { in: seededCaseIds } },
+    });
+  }
+
+  // Delete feeder client
+  await prisma.feederClient.deleteMany({
+    where: { feederBodyCode: "E2E_TEST_DGSC" },
+  });
+
+  seededCaseIds = [];
+}
+
+/**
+ * Clean up all prisma connections (call at very end).
+ */
+export async function teardownAll(): Promise<void> {
+  if (prisma) {
+    await prisma.$disconnect();
+    prisma = null;
+  }
 }
