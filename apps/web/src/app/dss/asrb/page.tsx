@@ -10,10 +10,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { listCases } from "@/lib/asrb/cases";
 import type { ASRBCase, FeederClient } from "@prisma/client";
-import { StatusPill } from "@/components/dss/status-pill";
-import { Tag } from "@/components/dss/tag";
+import StatusPill from "@/components/dss/status-pill";
+import Tag from "@/components/dss/tag";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -199,14 +198,18 @@ function AsrbContent() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listCases({
-        status: Array.from(selectedStatuses),
-        caseType: Array.from(selectedCaseTypes),
-        urgency: Array.from(selectedUrgencies),
-        feederBodyType: Array.from(selectedFeederBodyTypes),
-        search: searchQuery || undefined,
-      });
-      setCases(data);
+      const params = new URLSearchParams();
+      if (selectedStatuses.size > 0) params.set("status", [...selectedStatuses].join(","));
+      if (selectedCaseTypes.size > 0) params.set("caseType", [...selectedCaseTypes].join(","));
+      if (selectedUrgencies.size > 0) params.set("urgency", [...selectedUrgencies].join(","));
+      if (selectedFeederBodyTypes.size > 0) params.set("feederBodyType", [...selectedFeederBodyTypes].join(","));
+      if (searchQuery) params.set("q", searchQuery);
+
+      const qs = params.toString();
+      const res = await fetch(`/api/dss/asrb/cases${qs ? `?${qs}` : ""}`);
+      if (!res.ok) throw new Error("Failed to load cases");
+      const data = await res.json();
+      setCases(data.cases);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load cases");
     } finally {

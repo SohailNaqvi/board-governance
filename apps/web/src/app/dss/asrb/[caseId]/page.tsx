@@ -8,8 +8,8 @@
 import Link from "next/link";
 import { getCase } from "@/lib/asrb/cases";
 import Card from "@/components/dss/card";
-import { StatusPill } from "@/components/dss/status-pill";
-import { Tag } from "@/components/dss/tag";
+import StatusPill from "@/components/dss/status-pill";
+import Tag from "@/components/dss/tag";
 
 interface CaseDetailPageProps {
   params: { caseId: string };
