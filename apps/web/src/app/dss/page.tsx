@@ -96,30 +96,35 @@ export default function StrategicCockpitPage() {
           value="4,782"
           delta={3.1}
           deltaType="down"
+          isMock
         />
         <KpiTile
           label="At-risk students"
           value="187"
           delta={42}
           deltaType="flag"
+          isMock
         />
         <KpiTile
           label="Research pipeline"
           value="PKR 412M"
           delta={11.4}
           deltaType="up"
+          isMock
         />
         <KpiTile
           label="Faculty load index"
           value="1.08"
           delta={3}
           deltaType="flag"
+          isMock
         />
         <KpiTile
           label="Fee collection"
           value="86.4%"
           delta={2.3}
           deltaType="down"
+          isMock
         />
       </div>
 

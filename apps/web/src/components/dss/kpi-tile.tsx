@@ -5,9 +5,10 @@ interface KpiTileProps {
   value: string | number;
   delta?: number;
   deltaType?: 'up' | 'down' | 'flag';
+  isMock?: boolean;
 }
 
-export default function KpiTile({ label, value, delta, deltaType = 'flag' }: KpiTileProps) {
+export default function KpiTile({ label, value, delta, deltaType = 'flag', isMock = false }: KpiTileProps) {
   let deltaColor = 'var(--muted)';
   let deltaArrow = '';
 
@@ -59,15 +60,18 @@ export default function KpiTile({ label, value, delta, deltaType = 'flag' }: Kpi
           {deltaArrow} {Math.abs(delta)}%
         </div>
       )}
-      <div
-        style={{
-          fontSize: '11px',
-          color: 'var(--muted)',
-          fontStyle: 'italic',
-        }}
-      >
-        (mock)
-      </div>
+      {isMock && (
+        <div
+          style={{
+            fontSize: '11px',
+            color: 'var(--muted)',
+            fontStyle: 'italic',
+          }}
+          data-testid="kpi-mock-label"
+        >
+          (mock)
+        </div>
+      )}
     </div>
   );
 }
