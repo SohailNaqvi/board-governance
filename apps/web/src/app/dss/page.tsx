@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import KpiTile from '@/components/dss/kpi-tile';
 import AlertBanner from '@/components/dss/alert-banner';
 import Card from '@/components/dss/card';
@@ -261,6 +262,21 @@ export default function StrategicCockpitPage() {
                 status="on-track"
                 due="T-26d"
               />
+            </div>
+            <div style={{ padding: '12px 20px', borderTop: '1px solid var(--line)', textAlign: 'right' }}>
+              <Link
+                href="/dss/action-tracker"
+                data-testid="action-followup-link"
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  color: 'var(--amber)',
+                  textDecoration: 'none',
+                  letterSpacing: '0.02em',
+                }}
+              >
+                View all →
+              </Link>
             </div>
           </Card>
 
