@@ -57,7 +57,7 @@ test.describe("Decision Register", () => {
     const firstLink = page.locator("table tbody tr a").first();
     await firstLink.click();
 
-    await expect(page).toHaveURL(/\/dss\/decision-register\/DEC-/, {
+    await expect(page).toHaveURL(/\/dss\/decision-register\/E2E-DEC-/, {
       timeout: 10_000,
     });
   });
@@ -69,7 +69,7 @@ test.describe("Decision Register", () => {
     await authenticateContext(context, baseURL!);
     const page = await context.newPage();
 
-    await page.goto("/dss/decision-register/DEC-2025-001");
+    await page.goto("/dss/decision-register/E2E-DEC-2025-001");
 
     await expect(page.getByTestId("decision-detail")).toBeVisible({
       timeout: 10_000,
