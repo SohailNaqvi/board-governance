@@ -81,6 +81,31 @@ test.describe("DSS Pages", () => {
     });
   });
 
+  test("sidebar navigation to /dss/decision-register", async ({
+    context,
+    baseURL,
+  }) => {
+    await authenticateContext(context, baseURL!);
+    const page = await context.newPage();
+
+    await page.goto("/dss");
+    await expect(page.getByTestId("strategic-cockpit")).toBeVisible({
+      timeout: 10_000,
+    });
+
+    // Click Decision Register in sidebar
+    await page.locator("a:has-text('Decision Register')").first().click();
+
+    await expect(page).toHaveURL(/\/dss\/decision-register/, {
+      timeout: 10_000,
+    });
+
+    // Page is now a real list page
+    await expect(page.getByTestId("decision-register-list")).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
   test("unauthenticated /dss shows login-required", async ({ page }) => {
     const response = await page.goto("/dss");
     // Middleware returns 401 with inline "Login required" HTML

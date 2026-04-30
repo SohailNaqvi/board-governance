@@ -295,7 +295,6 @@ export async function seedBoardActions(): Promise<string[]> {
 export async function teardownBoardActions(): Promise<void> {
   if (!prisma) return;
 
-  // Delete only actions created by this seed run
   if (seededActionIds.length > 0) {
     await prisma.boardActionItem.deleteMany({
       where: {
@@ -305,4 +304,77 @@ export async function teardownBoardActions(): Promise<void> {
   }
 
   seededActionIds = [];
+}
+
+// ─── Decision seeding ────────────────────────────────────────
+
+let seededDecisionIds: string[] = [];
+
+export async function seedDecisions(): Promise<string[]> {
+  if (!prisma) prisma = new PrismaClient();
+
+  const decisions = [
+    {
+      decisionRef: "E2E-DEC-2025-001",
+      title: "Approval of Strategic Plan 2025-2030",
+      summary: "Board approved the institutional strategic plan for the next five years.",
+      sourceBodyType: "BOARD_OF_GOVERNORS" as const,
+      sourceMeeting: "BoG Q1 Feb 2025",
+      decidedAt: new Date("2025-02-15"),
+      category: "STRATEGIC" as const,
+      status: "APPROVED" as const,
+      proposer: "VC",
+    },
+    {
+      decisionRef: "E2E-DEC-2025-002",
+      title: "PhD Synopsis Approval — Machine Learning for Agriculture",
+      summary: "ASRB approved the PhD synopsis for student 2022-PHD-CS-001.",
+      sourceBodyType: "ASRB" as const,
+      sourceMeeting: "ASRB Meeting 12",
+      decidedAt: new Date("2025-03-10"),
+      category: "RESEARCH" as const,
+      status: "APPROVED" as const,
+      proposer: "ASRB Chair",
+      caseRef: "asrb-case-001",
+    },
+    {
+      decisionRef: "E2E-DEC-2025-003",
+      title: "Fee Structure Revision FY2026",
+      summary: "Syndicate deferred the fee revision pending further consultation.",
+      sourceBodyType: "SYNDICATE" as const,
+      sourceMeeting: "Syndicate Meeting 141",
+      decidedAt: new Date("2025-04-20"),
+      category: "FINANCIAL" as const,
+      status: "DEFERRED" as const,
+      proposer: "Treasurer",
+    },
+  ];
+
+  seededDecisionIds = [];
+  for (const d of decisions) {
+    try {
+      const result = await prisma.governanceDecision.upsert({
+        where: { decisionRef: d.decisionRef },
+        update: {},
+        create: d,
+      });
+      seededDecisionIds.push(result.id);
+    } catch (err) {
+      console.warn(`[e2e] Skipping decision ${d.decisionRef}: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  return seededDecisionIds;
+}
+
+export async function teardownDecisions(): Promise<void> {
+  if (!prisma) return;
+
+  await prisma.governanceDecision.deleteMany({
+    where: {
+      decisionRef: { startsWith: "E2E-DEC-" },
+    },
+  });
+
+  seededDecisionIds = [];
 }

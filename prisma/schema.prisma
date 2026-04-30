@@ -716,3 +716,55 @@ model BoardActionItem {
   @@index([category])
   @@index([dueDate])
 }
+
+
+// ============ Decision Register ============
+
+enum GovernanceBodyType {
+  BOARD_OF_GOVERNORS
+  SYNDICATE
+  ACADEMIC_COUNCIL
+  ASRB
+}
+
+enum DecisionCategory {
+  STRATEGIC
+  ACADEMIC
+  FINANCIAL
+  HR
+  RESEARCH
+  COMPLIANCE
+  STUDENT_AFFAIRS
+  OPERATIONS
+}
+
+enum DecisionStatus {
+  APPROVED
+  CONDITIONALLY_APPROVED
+  DEFERRED
+  REJECTED
+  RATIFIED
+  RESCINDED
+}
+
+
+model GovernanceDecision {
+  id            String              @id @default(cuid())
+  decisionRef   String              @unique
+  title         String
+  summary       String
+  sourceBodyType GovernanceBodyType
+  sourceMeeting String
+  decidedAt     DateTime
+  category      DecisionCategory
+  status        DecisionStatus
+  proposer      String
+  caseRef       String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([sourceBodyType])
+  @@index([status])
+  @@index([category])
+  @@index([decidedAt])
+}

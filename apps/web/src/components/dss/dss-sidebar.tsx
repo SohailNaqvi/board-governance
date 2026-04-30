@@ -18,6 +18,7 @@ const sections = [
     title: 'Intelligence',
     items: [
       { label: 'Action Tracker', href: '/dss/action-tracker', count: 41 },
+      { label: 'Decision Register', href: '/dss/decision-register', count: undefined },
       { label: 'Enrolment Forecast', href: '/dss/enrolment-forecast', count: undefined },
       { label: 'Early Warning', href: '/dss/early-warning', count: undefined },
       { label: 'Research Pipeline', href: '/dss/research-pipeline', count: undefined },
